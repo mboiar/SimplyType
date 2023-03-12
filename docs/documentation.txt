@@ -1,0 +1,3 @@
+07.03.2023 - Maksym Boiar - Założenie projektu
+Założono projekt w Github Projects, wstępną wersję kodu na Github i serwer na Discord dla współpracy zdalnej.
+

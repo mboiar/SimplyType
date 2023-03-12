@@ -1,0 +1,52 @@
+
+QWidget {
+    background-color: var(--background-color);
+    color: var(--foreground-color);
+    font-family: sans-serif;
+}
+QPushButton {
+    border: none;
+    font-size: 10pt;
+}
+QPushButton:hover {
+    color: var(--foreground-selected-color);
+}
+
+/* QPushButton#stats {
+    color: "#007acc";
+} */
+
+.highlighted {
+    color: var(--standout-color);
+}
+
+.faded {
+    /* color: rgba(45,45,48, 1); */
+}
+
+.super-text{
+    color: var(--foreground-selected-color);
+}
+
+.words_to_type {
+    font-size: 18pt;
+}
+
+QLineEdit {
+    font-size: 18pt;
+    border: none
+}
+
+.heading {
+    font-size: 20pt;
+    font-weight: 700;
+}
+
+/* .link {
+    text-decoration: none;
+    color: var(--foreground-color)
+} */
+
+#link_github {
+    color: var(--foreground-color);
+}
