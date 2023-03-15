@@ -20,10 +20,6 @@ QPushButton:hover {
     color: var(--standout-color);
 }
 
-.faded {
-    /* color: rgba(45,45,48, 1); */
-}
-
 .super-text{
     color: var(--foreground-selected-color);
 }
@@ -34,7 +30,8 @@ QPushButton:hover {
 
 QLineEdit {
     font-size: 18pt;
-    border: none
+    border: none;
+    color: var(--foreground-selected-color);
 }
 
 .heading {
@@ -50,3 +47,7 @@ QLineEdit {
 #link_github {
     color: var(--foreground-color);
 }
+
+/* #timer {
+    display: none;
+} */
