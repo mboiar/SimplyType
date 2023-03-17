@@ -24,11 +24,21 @@ QPushButton:hover {
     color: var(--foreground-selected-color);
 }
 
+.error-text{
+    color: var(--error-color);
+}
+
 .words_to_type {
     font-size: 18pt;
 }
 
 QLineEdit {
+    font-size: 18pt;
+    border: none;
+    color: var(--foreground-selected-color);
+}
+
+InputLabel {
     font-size: 18pt;
     border: none;
     color: var(--foreground-selected-color);
@@ -48,6 +58,7 @@ QLineEdit {
     color: var(--foreground-color);
 }
 
-/* #timer {
-    display: none;
-} */
+#timer_label {
+    font-size: 18pt;
+    font-weight: 700;
+}
