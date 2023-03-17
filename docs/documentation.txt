@@ -1,0 +1,8 @@
+07.03.2023 - Maksym Boiar - Założenie projektu
+Założono projekt w Github Projects, wstępną wersję kodu na Github i serwer na Discord dla współpracy zdalnej.
+
+15.03.2023 - Maksym Boiar - Personalizacja interfejsu
+Dodano możliwość wyboru języka i motywu interfejsu.
+
+17.03.2023 - Maksym Boiar - Interfejs GUI + walidacja wpisywanego tekstu na bieżąco
+Stworzono interfejs GUI dla okna głównego aplikacji oraz zaimplementowano walidację tekstu wpisywanego przez użytkownika.
