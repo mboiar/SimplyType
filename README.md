@@ -12,7 +12,7 @@ A cross-platform typing game with a clean Qt-based GUI interface.
 - run the application:
 
     ```
-    python3 .\speed_typing_game\main.py
+    python3 .\speed_typing_game.py
     ```
 
     
