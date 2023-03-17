@@ -2,16 +2,10 @@ import sys
 import time
 
 import PyQt6.QtCore as QtCore
-from PyQt6.QtCore import QUrl, Qt
-from PyQt6.QtGui import QDesktopServices, QIcon, QCursor, QTextDocument
-from PyQt6.QtWidgets import (
-    QHBoxLayout,
-    QLabel,
-    QLineEdit,
-    QPushButton,
-    QVBoxLayout,
-    QWidget,
-)
+from PyQt6.QtCore import Qt, QUrl
+from PyQt6.QtGui import QCursor, QDesktopServices, QIcon, QTextDocument
+from PyQt6.QtWidgets import (QHBoxLayout, QLabel, QLineEdit, QPushButton,
+                             QVBoxLayout, QWidget)
 
 from speed_typing_game import config
 
@@ -21,11 +15,11 @@ _translate = QtCore.QCoreApplication.translate
 class InputLabel(QLabel):
     def __init__(self, width=600):
         super().__init__()
-        self.cursor_pos = (0, 0, 5, 10) # TODO: use fontmetrics
+        self.cursor_pos = (0, 0, 5, 10)  # TODO: use fontmetrics
         self.cursor = QtCore.QRect(*(self.cursor_pos))
         self.text = ""
-        self.max_chars = 80*3 # TODO: set based on width
-        self.setText(self.text[:self.max_chars])
+        self.max_chars = 80 * 3  # TODO: set based on width
+        self.setText(self.text[: self.max_chars])
         self.incorrect_chars = {}
         self.correct_chars = {}
         self.pos = 0
@@ -40,19 +34,19 @@ class InputLabel(QLabel):
 
     def update_label(self, char, pos):
         if self.text[pos] == char:
-            updated_char_class = 'super-text'
+            updated_char_class = "super-text"
             if char in self.correct_chars.keys():
                 self.correct_chars[char] += 1
             else:
                 self.correct_chars[char] = 1
         else:
-            updated_char_class = 'error-text'
+            updated_char_class = "error-text"
             if char in self.incorrect_chars.keys():
                 self.incorrect_chars[char] += 1
             else:
                 self.incorrect_chars[char] = 1
-        new_char =  f'<span class="{updated_char_class}">{char}</span>'
-        self.text = self.text[:pos] + new_char + self.text[pos+1:]
+        new_char = f'<span class="{updated_char_class}">{char}</span>'
+        self.text = self.text[:pos] + new_char + self.text[pos + 1 :]
         self.setText(self.text)
 
 
@@ -68,12 +62,13 @@ is a multi-line text"
         self.pos = 0
         self.error_color = "#CB4C4E"
         self.correct_color = "#e3e3e3"
-        self.colored_char_width = len('<span style="color: #e3e3e3;">a</span>')
         self.words_to_type_doc = QTextDocument()
         self.words_to_type_doc.setHtml(self.words_to_type_label.text())
         self.plain_label = self.words_to_type_doc.toPlainText()
-        self.typed_in = ''
+        # self.typed_in = ''
         self.cur_char = self.words[0]
+        self.typed_in = []
+        # self.max_pos = 0
 
     def init_window(self):
         self.resize(900, 500)
@@ -91,7 +86,7 @@ is a multi-line text"
         self.input_label = InputLabel()
         self.words_input = QLineEdit()
         self.words_input.textEdited.connect(self.validate_character)
-        self.words_input.textEdited.connect(self.move_cursor_back_on_backspace)
+        # self.words_input.textEdited.connect(self.move_cursor_back_on_backspace)
         # self.words_input.setEchoMode(QLineEdit.NoEcho)
         # self.words_input.setCursorPosition()
         self.button_reset = QPushButton()
@@ -123,7 +118,7 @@ is a multi-line text"
         self.words_to_type_label = QLabel(self.get_words_subset())
         self.words_to_type_label.setWordWrap(True)
         self.words_to_type_label.setProperty("class", "words_to_type")
-        self.description_label = QLabel("Begin typing to start")
+        self.description_label = QLabel()
         for button in [
             self.button_about,
             self.button_menu1,
@@ -163,9 +158,23 @@ is a multi-line text"
 
         self.retranslate()
 
-    def move_cursor_back_on_backspace(self, key):
+    def move_cursor_back_on_backspace(self, event):
+        key = event.key()
+        if key == QtCore.Qt.Key.Key_Backspace:
+            print("Backspace!!!")
+            if self.typed_in:
+                # self.max_pos = max(self.max_pos, self.pos)
+                self.typed_in.pop()
+                self.pos = max(self.pos - 1, 0)
+                self.words_to_type_label.setText(
+                    self.typed_in + self.words[self.pos:]
+                )
         if key[-1] == QtCore.Qt.Key.Key_Backspace:
-            self.pos = max(self.pos-1, 0)
+            # self.max_pos = max(self.max_pos, self.pos)
+            self.words_to_type_label.setText(
+                self.words_to_type_label.text()[:-1]
+            )
+            self.pos = max(self.pos - 1, 0)
 
     def open_hyperlink(self, linkStr):
         QDesktopServices.openUrl(QUrl(linkStr))
@@ -178,23 +187,28 @@ is a multi-line text"
         self.words_input.clear()
         # TODO: reset game
 
-    def validate_character(self):
+    def validate_character(self, key):
+        # TODO: handle backspace
+        # if key and key[-1] == QtCore.Qt.Key.Key_Backspace:
+        # self.max_pos = max(self.max_pos, self.pos)
+        # self.words_to_type_label.setText(self.words_to_type_label.text()[:-1])
+        # self.pos = max(self.pos-1, 0)
         """Check if typed character is correct."""
         self.words_to_type_doc.setHtml(self.words_to_type_label.text())
         self.plain_label = self.words_to_type_doc.toPlainText()
         char = self.words_input.text()[-1]
-        
+
         pos = self.pos
         self.pos += 1
         if self.words[pos] == char:
-            updated_char_class = 'super-text'
+            # updated_char_class = 'super-text'
             color = self.correct_color
             if char in self.correct_chars.keys():
                 self.correct_chars[char] += 1
             else:
                 self.correct_chars[char] = 1
         else:
-            updated_char_class = 'error-text'
+            # updated_char_class = 'error-text'
             color = self.error_color
             if char in self.incorrect_chars.keys():
                 self.incorrect_chars[char] += 1
@@ -205,12 +219,14 @@ is a multi-line text"
             else:
                 char = self.words[pos]
         # new_char =  f'<span class="{updated_char_class}">{char}</span>'
-        new_char =  self.set_html_color(char, color)
+        new_char = self.set_html_color(char, color)
         self.typed_in += new_char
         # text = self.words_to_type_label.text()
         # text = self.plain_label[:pos] + new_char + self.plain_label[pos+1:]
         # self.words_input.setText(new_char)
-        self.words_to_type_label.setText(self.typed_in+self.words[self.pos:])
+        self.words_to_type_label.setText(
+            "".join(self.typed_in) + self.words[self.pos :]
+        )
 
     @staticmethod
     def set_html_color(text, color):
@@ -230,6 +246,9 @@ is a multi-line text"
         self.button_menu2.setText(_translate("QPushButton", "Mode"))
         self.button_menu3.setText(_translate("QPushButton", "Duration"))
         self.button_exit.setText(_translate("QPushButton", "Exit"))
+        self.description_label.setText(
+            _translate("Qlabel", "Begin typing to start")
+        )
 
     def start_game(self):
         self.sidebarLayout.hide()
@@ -237,7 +256,7 @@ is a multi-line text"
         self.description_label.hide()
         self.timer_label.show()
         self.timer = QtCore.QTimer()
-        self.duration = 30*1000
+        self.duration = 30 * 1000
         update_interval = 1000
         self.timer.singleShot(self.duration, self.end_game)
         self.timer.timeout.connect(self.update_timer_label)
@@ -264,7 +283,6 @@ is a multi-line text"
 
     def save_results(self):
         pass
-
 
     def close(self):
         sys.exit()

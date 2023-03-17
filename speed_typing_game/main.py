@@ -5,8 +5,8 @@ import sys
 import PyQt6.QtCore as QtCore
 from PyQt6.QtWidgets import QApplication
 
-from speed_typing_game.views import MainWindow
 from speed_typing_game.config import RESOURCES_DIR
+from speed_typing_game.views import MainWindow
 
 
 def load_stylesheet(app, theme_name):
