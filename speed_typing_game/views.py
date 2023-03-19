@@ -1,5 +1,6 @@
 import sys
 import time
+import logging
 
 import PyQt6.QtCore as QtCore
 from PyQt6.QtCore import Qt, QUrl
@@ -10,7 +11,15 @@ from PyQt6.QtWidgets import (QHBoxLayout, QLabel, QLineEdit, QPushButton,
 from speed_typing_game import config
 
 _translate = QtCore.QCoreApplication.translate
-
+update_timer_interval = 200
+game_duration = 20*1000
+BACKSPACE_KEY = 16777219
+DELETE_KEY = 16777223
+X_KEY = 88
+V_KEY = 86
+TAKEBACK_KEYS = [BACKSPACE_KEY, DELETE_KEY]
+CUT_KEYS = [X_KEY, V_KEY]
+CTRL_MODIFIER = 2
 
 class InputLabel(QLabel):
     def __init__(self, width=600):
@@ -32,27 +41,30 @@ class InputLabel(QLabel):
         # TODO: hide prev. line, set cursor, show new text
         pass
 
-    def update_label(self, char, pos):
-        if self.text[pos] == char:
-            updated_char_class = "super-text"
-            if char in self.correct_chars.keys():
-                self.correct_chars[char] += 1
-            else:
-                self.correct_chars[char] = 1
-        else:
-            updated_char_class = "error-text"
-            if char in self.incorrect_chars.keys():
-                self.incorrect_chars[char] += 1
-            else:
-                self.incorrect_chars[char] = 1
-        new_char = f'<span class="{updated_char_class}">{char}</span>'
-        self.text = self.text[:pos] + new_char + self.text[pos + 1 :]
-        self.setText(self.text)
+class CustomLineEdit(QLineEdit):
+    def __init__(self, parent, allow_takeback = False, *args, **kwargs):
+        self.logger = logging.getLogger(__name__)
+        self.allow_takeback = allow_takeback
+        super().__init__(*args, **kwargs)
+
+    def keyPressEvent(self, event):
+        key = event.key()
+        modifier = event.nativeModifiers()
+        window = self.parent()
+        self.logger.debug(f"Detected keyPressEvent: key {key} {'with a modifier:'+ modifier if modifier else ''}")
+        is_cutpaste_event = (modifier==CTRL_MODIFIER and key in CUT_KEYS)
+        if (not self.allow_takeback) and (key in TAKEBACK_KEYS or is_cutpaste_event):
+            self.logger.debug(f"Skipped takeback event: takeback is not allowed")
+            return
+        if not window.game_in_progress:
+            window.start_game()
+        super().keyPressEvent(event)
 
 
 class MainWindow(QWidget):
     def __init__(self):
         super().__init__()
+        self.logger = logging.getLogger(__name__)
         self.words = "words will appear here you can see that this\
 is a multi-line text"
         self.incorrect_chars = {}
@@ -62,15 +74,14 @@ is a multi-line text"
         self.pos = 0
         self.error_color = "#CB4C4E"
         self.correct_color = "#e3e3e3"
-        self.words_to_type_doc = QTextDocument()
-        self.words_to_type_doc.setHtml(self.words_to_type_label.text())
-        self.plain_label = self.words_to_type_doc.toPlainText()
-        # self.typed_in = ''
         self.cur_char = self.words[0]
         self.typed_in = []
-        # self.max_pos = 0
+        self.game_in_progress = False
+        self.timer = QtCore.QTimer()
+        self.update_timer = QtCore.QTimer()
 
     def init_window(self):
+        self.logger.debug("Initialized main window")
         self.resize(900, 500)
         self.setWindowTitle(config.PROJECT_NAME)
         self.setWindowIcon(
@@ -82,9 +93,13 @@ is a multi-line text"
         self.title = QLabel('<font color="#007acc">Simply</font>Type')
         self.title.setProperty("class", "heading")
         self.timer_label = QLabel("32")
+        sp_retain = self.timer_label.sizePolicy()
+        sp_retain.setRetainSizeWhenHidden(True)
+        self.timer_label.setSizePolicy(sp_retain)
         self.timer_label.setObjectName("timer_label")
+
         self.input_label = InputLabel()
-        self.words_input = QLineEdit()
+        self.words_input = CustomLineEdit(self)
         self.words_input.textEdited.connect(self.validate_character)
         # self.words_input.textEdited.connect(self.move_cursor_back_on_backspace)
         # self.words_input.setEchoMode(QLineEdit.NoEcho)
@@ -158,74 +173,39 @@ is a multi-line text"
 
         self.retranslate()
 
-    def move_cursor_back_on_backspace(self, event):
-        key = event.key()
-        if key == QtCore.Qt.Key.Key_Backspace:
-            print("Backspace!!!")
-            if self.typed_in:
-                # self.max_pos = max(self.max_pos, self.pos)
-                self.typed_in.pop()
-                self.pos = max(self.pos - 1, 0)
-                self.words_to_type_label.setText(
-                    self.typed_in + self.words[self.pos:]
-                )
-        if key[-1] == QtCore.Qt.Key.Key_Backspace:
-            # self.max_pos = max(self.max_pos, self.pos)
-            self.words_to_type_label.setText(
-                self.words_to_type_label.text()[:-1]
-            )
-            self.pos = max(self.pos - 1, 0)
-
     def open_hyperlink(self, linkStr):
         QDesktopServices.openUrl(QUrl(linkStr))
 
-    def get_user_input(self):
-        return self.words_input.text()
-
     def reset_game(self):
-        """Reset the game: re-generate words and reset cursor position."""
-        self.words_input.clear()
-        # TODO: reset game
+        self.logger.debug("Reset game")
+        self.end_game()
 
     def validate_character(self, key):
-        # TODO: handle backspace
-        # if key and key[-1] == QtCore.Qt.Key.Key_Backspace:
-        # self.max_pos = max(self.max_pos, self.pos)
-        # self.words_to_type_label.setText(self.words_to_type_label.text()[:-1])
-        # self.pos = max(self.pos-1, 0)
-        """Check if typed character is correct."""
-        self.words_to_type_doc.setHtml(self.words_to_type_label.text())
-        self.plain_label = self.words_to_type_doc.toPlainText()
         char = self.words_input.text()[-1]
-
         pos = self.pos
         self.pos += 1
-        if self.words[pos] == char:
-            # updated_char_class = 'super-text'
+        char_correct = self.words[pos]
+        self.logger.debug(f"Typed in '{char}' - correct answer'{char_correct}' - position {pos}")
+        if char_correct == char:                # correct character typed
             color = self.correct_color
             if char in self.correct_chars.keys():
                 self.correct_chars[char] += 1
             else:
                 self.correct_chars[char] = 1
-        else:
-            # updated_char_class = 'error-text'
+        else:                                       # incorrect character typed
             color = self.error_color
             if char in self.incorrect_chars.keys():
                 self.incorrect_chars[char] += 1
             else:
                 self.incorrect_chars[char] = 1
-            if self.words[pos] == " ":
+            if char_correct == " ":
                 char = "_"
             else:
-                char = self.words[pos]
-        # new_char =  f'<span class="{updated_char_class}">{char}</span>'
+                char = char_correct
         new_char = self.set_html_color(char, color)
-        self.typed_in += new_char
-        # text = self.words_to_type_label.text()
-        # text = self.plain_label[:pos] + new_char + self.plain_label[pos+1:]
-        # self.words_input.setText(new_char)
+        self.typed_in.append(new_char)
         self.words_to_type_label.setText(
-            "".join(self.typed_in) + self.words[self.pos :]
+            "".join(self.typed_in) + self.words[self.pos:]
         )
 
     @staticmethod
@@ -234,6 +214,7 @@ is a multi-line text"
 
     def get_words_subset(self):
         """Get a subset of words that will immediately appear on screen."""
+        # TODO
         words = self.words
         return "".join(words)
 
@@ -251,35 +232,68 @@ is a multi-line text"
         )
 
     def start_game(self):
-        self.sidebarLayout.hide()
-        self.menuLayout.hide()
+        mode = None
+        time_ = None
+        self.logger.info(f"Started game: mode {mode} - time {time_}")
+        self.game_in_progress = True
+        for button in [
+            self.button_about,
+            self.button_menu1,
+            self.button_menu2,
+            self.button_menu3,
+            self.button_stats,
+        ]:
+            button.hide()
         self.description_label.hide()
         self.timer_label.show()
-        self.timer = QtCore.QTimer()
-        self.duration = 30 * 1000
-        update_interval = 1000
-        self.timer.singleShot(self.duration, self.end_game)
-        self.timer.timeout.connect(self.update_timer_label)
-        self.timer.start(update_interval)
+
+        self.timer.timeout.connect(self.end_game)
+        self.timer.setSingleShot(True)
+        self.timer.start(game_duration)
+        self.update_timer.timeout.connect(self.update_timer_label)
+        self.update_timer.start(update_timer_interval)
+
         self.start_time = time.time()
 
     def display_results(self):
         pass
 
     def end_game(self):
-        self.end_time = time.time()
-        time_elapsed = self.end_time - self.start_time
-        self.save_results()
-        self.sidebarLayout.show()
-        self.menuLayout.show()
-        self.timer_label.hide()
-        self.description_label.show()
-        self.display_results()
+        if self.game_in_progress:
+            self.end_time = time.time()
+            time_elapsed = self.end_time - self.start_time
+            self.logger.info(f"Finished game: time elapsed {time_elapsed:.2f}s - characters typed {self.pos}")
+            self.update_timer.stop()
+            self.save_results()
+            self.words_input.clear()
+            self.words_to_type_label.setText(self.words) # TODO: do this after results shown
 
-        self.reset_game()
+            # self.sidebarLayout.show()
+            # self.menuLayout.show()
+            for button in [
+                self.button_about,
+                self.button_menu1,
+                self.button_menu2,
+                self.button_menu3,
+                # self.button_reset,
+                # self.button_settings,
+                self.button_stats,
+                # self.button_exit,
+            ]:
+                button.show()
+            self.timer_label.hide()
+            self.description_label.show()
+            self.display_results()
+            self.words_input.setFocus()
+            self.game_in_progress = False
+            self.pos = 0
+            self.typed_in = []
+            self.incorrect_chars = {}
+            self.correct_chars = {}
+            self.cur_char = self.words[0]
 
     def update_timer_label(self):
-        self.timer_label.setText(self.timer.remainingTime())
+        self.timer_label.setText(str(int(self.timer.remainingTime()//1000)))
 
     def save_results(self):
         pass
