@@ -1,17 +1,18 @@
 import sys
 import time
+import logging
 
 import PyQt6.QtCore as QtCore
 from PyQt6.QtCore import Qt, QUrl
 from PyQt6.QtGui import QCursor, QDesktopServices, QIcon, QTextDocument, QKeySequence
 from PyQt6.QtWidgets import (QHBoxLayout, QLabel, QLineEdit, QPushButton,
-                             QVBoxLayout, QWidget, QSizePolicy)
+                             QVBoxLayout, QWidget)
 
 from speed_typing_game import config
 
 _translate = QtCore.QCoreApplication.translate
 update_timer_interval = 200
-game_duration = 3*1000
+game_duration = 20*1000
 BACKSPACE_KEY = 16777219
 DELETE_KEY = 16777223
 X_KEY = 88
@@ -42,24 +43,28 @@ class InputLabel(QLabel):
 
 class CustomLineEdit(QLineEdit):
     def __init__(self, parent, allow_takeback = False, *args, **kwargs):
+        self.logger = logging.getLogger(__name__)
         self.allow_takeback = allow_takeback
         super().__init__(*args, **kwargs)
 
     def keyPressEvent(self, event):
+        key = event.key()
+        modifier = event.nativeModifiers()
         window = self.parent()
-        is_cutpaste_event = event.nativeModifiers()==CTRL_MODIFIER and event.key() in CUT_KEYS
-        if (not self.allow_takeback) and (event.key() in TAKEBACK_KEYS or is_cutpaste_event):
-            print("U-hu")
+        self.logger.debug(f"Detected keyPressEvent: key {key} {'with a modifier:'+ modifier if modifier else ''}")
+        is_cutpaste_event = (modifier==CTRL_MODIFIER and key in CUT_KEYS)
+        if (not self.allow_takeback) and (key in TAKEBACK_KEYS or is_cutpaste_event):
+            self.logger.debug(f"Skipped takeback event: takeback is not allowed")
             return
         if not window.game_in_progress:
             window.start_game()
-        print(event.key())
         super().keyPressEvent(event)
 
 
 class MainWindow(QWidget):
     def __init__(self):
         super().__init__()
+        self.logger = logging.getLogger(__name__)
         self.words = "words will appear here you can see that this\
 is a multi-line text"
         self.incorrect_chars = {}
@@ -69,9 +74,6 @@ is a multi-line text"
         self.pos = 0
         self.error_color = "#CB4C4E"
         self.correct_color = "#e3e3e3"
-        # self.words_to_type_doc = QTextDocument()
-        # self.words_to_type_doc.setHtml(self.words_to_type_label.text())
-        # self.plain_label = self.words_to_type_doc.toPlainText()
         self.cur_char = self.words[0]
         self.typed_in = []
         self.game_in_progress = False
@@ -79,6 +81,7 @@ is a multi-line text"
         self.update_timer = QtCore.QTimer()
 
     def init_window(self):
+        self.logger.debug("Initialized main window")
         self.resize(900, 500)
         self.setWindowTitle(config.PROJECT_NAME)
         self.setWindowIcon(
@@ -170,79 +173,40 @@ is a multi-line text"
 
         self.retranslate()
 
-    def move_cursor_back_on_backspace(self, event):
-        key = event.key()
-        if key == QtCore.Qt.Key.Key_Backspace:
-            print("Backspace!!!")
-            if self.typed_in:
-                # self.max_pos = max(self.max_pos, self.pos)
-                self.typed_in.pop()
-                self.pos = max(self.pos - 1, 0)
-                self.words_to_type_label.setText(
-                    self.typed_in + self.words[self.pos:]
-                )
-        if key[-1] == QtCore.Qt.Key.Key_Backspace:
-            print("Backspace!!!")
-            # self.max_pos = max(self.max_pos, self.pos)
-            self.words_to_type_label.setText(
-                self.words_to_type_label.text()[:-1]
-            )
-            self.pos = max(self.pos - 1, 0)
-
     def open_hyperlink(self, linkStr):
         QDesktopServices.openUrl(QUrl(linkStr))
 
-    def get_user_input(self):
-        return self.words_input.text()
-
     def reset_game(self):
-        """Reset the game: re-generate words and reset cursor position."""
+        self.logger.debug("Reset game")
         self.end_game()
 
     def validate_character(self, key):
-        # print(key)
-        # if key and key[-1] == QtCore.Qt.Key.Key_Backspace:
-        # self.max_pos = max(self.max_pos, self.pos)
-        # self.words_to_type_label.setText(self.words_to_type_label.text()[:-1])
-        # self.pos = max(self.pos-1, 0)
-        """Check if typed character is correct."""
-        # self.words_to_type_doc.setHtml(self.words_to_type_label.text())
-        # self.plain_label = self.words_to_type_doc.toPlainText()
-        # print(self.words_input.backspace)
-        # if not self.words_input.backspace:
-
         char = self.words_input.text()[-1]
-
         pos = self.pos
         self.pos += 1
-        if self.words[pos] == char:
-            # updated_char_class = 'super-text'
+        char_correct = self.words[pos]
+        self.logger.debug(f"Typed in '{char}' - correct answer'{char_correct}' - position {pos}")
+        if char_correct == char:                # correct character typed
             color = self.correct_color
             if char in self.correct_chars.keys():
                 self.correct_chars[char] += 1
             else:
                 self.correct_chars[char] = 1
-        else:
-            # updated_char_class = 'error-text'
+        else:                                       # incorrect character typed
             color = self.error_color
             if char in self.incorrect_chars.keys():
                 self.incorrect_chars[char] += 1
             else:
                 self.incorrect_chars[char] = 1
-            if self.words[pos] == " ":
+            if char_correct == " ":
                 char = "_"
             else:
-                char = self.words[pos]
-        # new_char =  f'<span class="{updated_char_class}">{char}</span>'
+                char = char_correct
         new_char = self.set_html_color(char, color)
         self.typed_in.append(new_char)
-        # text = self.words_to_type_label.text()
-        # text = self.plain_label[:pos] + new_char + self.plain_label[pos+1:]
-        # self.words_input.setText(new_char)
         self.words_to_type_label.setText(
-            "".join(self.typed_in) + self.words[self.pos :]
+            "".join(self.typed_in) + self.words[self.pos:]
         )
-        # self.words_input.backspace = False
 
     @staticmethod
     def set_html_color(text, color):
@@ -250,6 +214,7 @@ is a multi-line text"
 
     def get_words_subset(self):
         """Get a subset of words that will immediately appear on screen."""
+        # TODO
         words = self.words
         return "".join(words)
 
@@ -267,27 +232,21 @@ is a multi-line text"
         )
 
     def start_game(self):
-        print("starting!")
+        mode = None
+        time_ = None
+        self.logger.info(f"Started game: mode {mode} - time {time_}")
         self.game_in_progress = True
-        # self.sidebarLayout.hide()
-        # self.menuLayout.hide()
         for button in [
             self.button_about,
             self.button_menu1,
             self.button_menu2,
             self.button_menu3,
-            # self.button_reset,
-            # self.button_settings,
             self.button_stats,
-            # self.button_exit,
         ]:
             button.hide()
         self.description_label.hide()
         self.timer_label.show()
 
-
-        # self.timer.singleShot(self.duration, self.end_game)
-        # print(self.timer.remainingTime())
         self.timer.timeout.connect(self.end_game)
         self.timer.setSingleShot(True)
         self.timer.start(game_duration)
@@ -300,11 +259,11 @@ is a multi-line text"
         pass
 
     def end_game(self):
-        print("ended!")
         if self.game_in_progress:
-            self.update_timer.stop()
             self.end_time = time.time()
             time_elapsed = self.end_time - self.start_time
+            self.logger.info(f"Finished game: time elapsed {time_elapsed:.2f}s - characters typed {self.pos}")
+            self.update_timer.stop()
             self.save_results()
             self.words_input.clear()
             self.words_to_type_label.setText(self.words) # TODO: do this after results shown
