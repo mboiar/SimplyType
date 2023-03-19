@@ -10,6 +10,8 @@ from PyQt6.QtWidgets import (QHBoxLayout, QLabel, QLineEdit, QPushButton,
 from speed_typing_game import config
 
 _translate = QtCore.QCoreApplication.translate
+update_timer_interval = 200
+game_duration = 3*1000
 BACKSPACE_KEY = 16777219
 DELETE_KEY = 16777223
 X_KEY = 88
@@ -73,6 +75,8 @@ is a multi-line text"
         self.cur_char = self.words[0]
         self.typed_in = []
         self.game_in_progress = False
+        self.timer = QtCore.QTimer()
+        self.update_timer = QtCore.QTimer()
 
     def init_window(self):
         self.resize(900, 500)
@@ -280,15 +284,16 @@ is a multi-line text"
             button.hide()
         self.description_label.hide()
         self.timer_label.show()
-        self.timer = QtCore.QTimer()
-        self.update_timer = QtCore.QTimer()
 
-        self.duration = 30 * 1000
-        update_interval = 1000
-        self.timer.singleShot(self.duration, self.end_game)
+
+        # self.timer.singleShot(self.duration, self.end_game)
+        # print(self.timer.remainingTime())
+        self.timer.timeout.connect(self.end_game)
+        self.timer.setSingleShot(True)
+        self.timer.start(game_duration)
         self.update_timer.timeout.connect(self.update_timer_label)
-        self.update_timer.start(update_interval)
-        self.timer.start()
+        self.update_timer.start(update_timer_interval)
+
         self.start_time = time.time()
 
     def display_results(self):
@@ -297,6 +302,7 @@ is a multi-line text"
     def end_game(self):
         print("ended!")
         if self.game_in_progress:
+            self.update_timer.stop()
             self.end_time = time.time()
             time_elapsed = self.end_time - self.start_time
             self.save_results()
@@ -328,7 +334,7 @@ is a multi-line text"
             self.cur_char = self.words[0]
 
     def update_timer_label(self):
-        self.timer_label.setText(str(self.timer.remainingTime()))
+        self.timer_label.setText(str(int(self.timer.remainingTime()//1000)))
 
     def save_results(self):
         pass
