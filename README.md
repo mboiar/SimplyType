@@ -1,7 +1,11 @@
-# The master of the keyboard
-A cross-platform typing game with a clean Qt-based GUI interface.
+# SimplyType
+A cross-platform typing game with a clean GUI interface.
 
 ## Features
+- different game modes
+- game statistics
+- theme and language customization
+- user-uploaded word sets
 
 ## Usage
 - Clone the repository and set working directory to 'speed-typing-game'
@@ -12,11 +16,5 @@ A cross-platform typing game with a clean Qt-based GUI interface.
 - run the application:
 
     ```
-<<<<<<< HEAD
-    python3 .\speed_typing_game\main.py
-=======
     python3 .\speed_typing_game.py
->>>>>>> main
     ```
-
-    
