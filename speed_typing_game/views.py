@@ -4,11 +4,12 @@ import logging
 
 import PyQt6.QtCore as QtCore
 from PyQt6.QtCore import Qt, QUrl
-from PyQt6.QtGui import QCursor, QDesktopServices, QIcon, QTextDocument
+from PyQt6.QtGui import QCursor, QDesktopServices, QIcon
 from PyQt6.QtWidgets import (QHBoxLayout, QLabel, QLineEdit, QPushButton,
                              QVBoxLayout, QWidget)
 
 from speed_typing_game import config
+from speed_typing_game.utils import get_color_palette
 
 _translate = QtCore.QCoreApplication.translate
 update_timer_interval = 200
@@ -62,7 +63,7 @@ class CustomLineEdit(QLineEdit):
 
 
 class MainWindow(QWidget):
-    def __init__(self):
+    def __init__(self, palette):
         super().__init__()
         self.logger = logging.getLogger(__name__)
         self.words = "words will appear here you can see that this\
@@ -70,15 +71,14 @@ is a multi-line text"
         self.incorrect_chars = {}
         self.correct_chars = {}
         self.text = self.words
-        self.init_window()
         self.pos = 0
-        self.error_color = "#CB4C4E"
-        self.correct_color = "#e3e3e3"
         self.cur_char = self.words[0]
         self.typed_in = []
         self.game_in_progress = False
         self.timer = QtCore.QTimer()
         self.update_timer = QtCore.QTimer()
+        self.palette = palette
+        self.init_window()
 
     def init_window(self):
         self.logger.debug("Initialized main window")
@@ -90,20 +90,19 @@ is a multi-line text"
 
         self.mainLayout = QVBoxLayout()
         self.setLayout(self.mainLayout)
-        self.title = QLabel('<font color="#007acc">Simply</font>Type')
+        standout_color = self.palette['--standout-color']
+        self.title = QLabel(f"<font color='{standout_color}'>Simply</font>Type")
         self.title.setProperty("class", "heading")
-        self.timer_label = QLabel("32")
+        self.timer_label = QLabel()
         sp_retain = self.timer_label.sizePolicy()
         sp_retain.setRetainSizeWhenHidden(True)
         self.timer_label.setSizePolicy(sp_retain)
         self.timer_label.setObjectName("timer_label")
+        self.timer_label.setProperty("class", "highlighted")
 
         self.input_label = InputLabel()
         self.words_input = CustomLineEdit(self)
         self.words_input.textEdited.connect(self.validate_character)
-        # self.words_input.textEdited.connect(self.move_cursor_back_on_backspace)
-        # self.words_input.setEchoMode(QLineEdit.NoEcho)
-        # self.words_input.setCursorPosition()
         self.button_reset = QPushButton()
 
         self.sidebarLayout = QVBoxLayout()
@@ -121,10 +120,10 @@ is a multi-line text"
         self.menuLayout.addWidget(self.button_menu2)
         self.menuLayout.addWidget(self.button_menu3)
 
-        # TODO: sort this styling mess out
+        text_color = self.palette["--foreground-color"]
         self.link_github = QLabel(
             f'<a href="{config.PROJECT_URL}" style="text-decoration:none;\
-            color:#fff">{config.PROJECT_VERSION}</a>'
+            color:{text_color}">{config.PROJECT_VERSION}</a>'
         )
         self.link_github.linkActivated.connect(self.open_hyperlink)
         self.link_github.setObjectName("link_github")
@@ -187,13 +186,13 @@ is a multi-line text"
         char_correct = self.words[pos]
         self.logger.debug(f"Typed in '{char}' - correct answer'{char_correct}' - position {pos}")
         if char_correct == char:                # correct character typed
-            color = self.correct_color
+            color = self.palette["--foreground-selected-color"]
             if char in self.correct_chars.keys():
                 self.correct_chars[char] += 1
             else:
                 self.correct_chars[char] = 1
         else:                                       # incorrect character typed
-            color = self.error_color
+            color = self.palette["--error-color"]
             if char in self.incorrect_chars.keys():
                 self.incorrect_chars[char] += 1
             else:

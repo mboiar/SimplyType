@@ -1,0 +1,16 @@
+{
+    "pastel": {
+        "--background-color": "#f3d0a4",
+        "--foreground-color": "#cfa093",
+        "--standout-color": "#660e60",
+        "--foreground-selected-color": "#00202e",
+        "--error-color": "#CB4C4E"
+    },
+    "pastel1": {
+        "--background-color": "#fbf2c4",
+        "--foreground-color": "#e5c185",
+        "--standout-color": "#008585",
+        "--foreground-selected-color": "#00202e",
+        "--error-color": "#CB4C4E"
+    }
+}

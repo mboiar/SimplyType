@@ -1,10 +1,9 @@
 {
-    "type": "dark",
-    "colors": {
+    "vscode": {
         "--background-color": "#1e1e1e",
         "--foreground-color": "#707070",
         "--standout-color": "#007acc",
         "--foreground-selected-color": "#e3e3e3",
-        "--error-color": "CB4C4E"
+        "--error-color": "#CB4C4E"
     }
 }
