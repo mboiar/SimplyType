@@ -103,9 +103,6 @@ is a multi-line text"
         self.input_label = InputLabel()
         self.words_input = CustomLineEdit(self)
         self.words_input.textEdited.connect(self.validate_character)
-        # self.words_input.textEdited.connect(self.move_cursor_back_on_backspace)
-        # self.words_input.setEchoMode(QLineEdit.NoEcho)
-        # self.words_input.setCursorPosition()
         self.button_reset = QPushButton()
 
         self.sidebarLayout = QVBoxLayout()
