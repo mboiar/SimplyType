@@ -4,7 +4,7 @@ import logging
 
 import PyQt6.QtCore as QtCore
 from PyQt6.QtCore import Qt, QUrl
-from PyQt6.QtGui import QCursor, QDesktopServices, QIcon, QTextDocument, QKeySequence
+from PyQt6.QtGui import QCursor, QDesktopServices, QIcon, QTextDocument
 from PyQt6.QtWidgets import (QHBoxLayout, QLabel, QLineEdit, QPushButton,
                              QVBoxLayout, QWidget)
 
