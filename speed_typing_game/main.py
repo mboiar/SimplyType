@@ -1,11 +1,17 @@
 import sys
-from datetime import datetime as dt
-import logging
+import os
 
 import PyQt6.QtCore as QtCore
 from PyQt6.QtWidgets import QApplication
+from PyQt6.QtGui import QIcon
 
 import speed_typing_game.config as config
+from speed_typing_game.utils import (
+    get_color_palette_names,
+    set_stylesheet,
+    setup_logging,
+    get_color_palette
+)
 from speed_typing_game.views import MainWindow
 from speed_typing_game.utils import setup_logging, set_stylesheet, detect_dark_theme_os, get_color_palette
 
@@ -35,10 +41,12 @@ def main():
         app.installTranslator(translator)
 
     # theme =  detect_dark_theme_os()
-    theme = 'dark'
-    set_stylesheet(app, config.COLOR_PALETTE, theme)
-    palette = get_color_palette(config.COLOR_PALETTE, theme)
+    theme = "dark"
+    palette_name = get_color_palette_names(theme)[0]
+    palette = get_color_palette(palette_name, theme)
+    set_stylesheet(app, palette_name, theme)
+    icon = QIcon(os.path.join(config.RESOURCES_DIR, "styles", theme, palette_name, "icon.png"))
 
-    window = MainWindow(palette)
+    window = MainWindow(palette, icon)
     window.show()
     sys.exit(app.exec())

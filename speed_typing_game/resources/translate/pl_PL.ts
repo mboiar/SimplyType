@@ -24,9 +24,9 @@
       <translation>Statystyki</translation>
     </message>
     <message>
-      <location filename="..\..\main.py" line="50" />
-      <source>Language</source>
-      <translation>Język</translation>
+        <location filename="../../views.py" line="224"/>
+        <source>Word set</source>
+        <translation>Zestaw słów</translation>
     </message>
     <message>
       <location filename="..\..\main.py" line="51" />

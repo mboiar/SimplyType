@@ -1,0 +1,7 @@
+{
+    "--background-color": "#f3d0a4",
+    "--foreground-color": "#cfa093",
+    "--standout-color": "#660e60",
+    "--foreground-selected-color": "#00202e",
+    "--error-color": "#CB4C4E"
+}
