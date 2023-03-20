@@ -25,8 +25,8 @@
     </message>
     <message>
       <location filename="..\..\views.py" line="224" />
-      <source>Language</source>
-      <translation>Мова</translation>
+      <source>Word set</source>
+      <translation>Набір слів</translation>
     </message>
     <message>
       <location filename="..\..\views.py" line="225" />

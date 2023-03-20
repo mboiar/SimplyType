@@ -77,7 +77,7 @@ class CustomLineEdit(QLineEdit):
 
 
 class MainWindow(QWidget):
-    def __init__(self, palette):
+    def __init__(self, palette_name, icon):
         super().__init__()
         self.logger = logging.getLogger(__name__)
         self.words = "words will appear here you can see that this\
@@ -91,16 +91,15 @@ is a multi-line text"
         self.game_in_progress = False
         self.timer = QtCore.QTimer()
         self.update_timer = QtCore.QTimer()
-        self.palette = palette
+        self.palette = palette_name
+        self.icon = icon
         self.init_window()
 
     def init_window(self):
         self.logger.debug("Initialized main window")
         self.resize(900, 500)
         self.setWindowTitle(config.PROJECT_NAME)
-        self.setWindowIcon(
-            QIcon(config.RESOURCES_DIR + "/images/" + config.ICON_FILENAME)
-        )
+        self.setWindowIcon(self.icon)
 
         self.mainLayout = QVBoxLayout()
         self.setLayout(self.mainLayout)
@@ -185,8 +184,12 @@ is a multi-line text"
 
         self.button_reset.clicked.connect(self.reset_game)
         self.button_exit.clicked.connect(self.close)
+        self.words_to_type_label.mousePressEvent = self.focus_input
 
         self.retranslate()
+
+    def focus_input(self, *args):
+        self.words_input.setFocus()
 
     def open_hyperlink(self, linkStr):
         QDesktopServices.openUrl(QUrl(linkStr))
@@ -194,6 +197,7 @@ is a multi-line text"
     def reset_game(self):
         self.logger.debug("Reset game")
         self.end_game()
+        self.focus_input()
 
     def validate_character(self, key):
         char = self.words_input.text()[-1]
@@ -250,7 +254,7 @@ is a multi-line text"
             QCoreApplication.translate("QPushButton", "About")
         )
         self.button_menu1.setText(
-            QCoreApplication.translate("QPushButton", "Language")
+            QCoreApplication.translate("QPushButton", "Word set")
         )
         self.button_menu2.setText(
             QCoreApplication.translate("QPushButton", "Mode")
@@ -323,13 +327,13 @@ is a multi-line text"
             self.timer_label.hide()
             self.description_label.show()
             self.display_results()
-            self.words_input.setFocus()
             self.game_in_progress = False
             self.pos = 0
             self.typed_in = []
             self.incorrect_chars = {}
             self.correct_chars = {}
             self.cur_char = self.words[0]
+            self.focus_input()
 
     def update_timer_label(self):
         self.timer_label.setText(str(int(self.timer.remainingTime() // 1000)))
