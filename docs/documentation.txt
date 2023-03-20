@@ -7,5 +7,7 @@ Dodano możliwość wyboru języka i motywu interfejsu.
 17.03.2023 - Maksym Boiar - Interfejs GUI + walidacja wpisywanego tekstu na bieżąco
 Stworzono interfejs GUI dla okna głównego aplikacji oraz zaimplementowano walidację tekstu wpisywanego przez użytkownika.
 
+18.03.2023 - Filip Chałupka - Implementacja podliczania statystyk gry
+
 19.03.2023 - Maksym Boiar - rejestracja zdarzeń + proces gry
 Dodano rejestrację przebiegu działania programu (logging) i zaimplementowano rozpoczęcie/zakończenie gry
