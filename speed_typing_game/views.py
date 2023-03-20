@@ -1,18 +1,24 @@
+import logging
 import sys
 import time
-import logging
 
 import PyQt6.QtCore as QtCore
-from PyQt6.QtCore import Qt, QUrl, QCoreApplication
+from PyQt6.QtCore import QCoreApplication, Qt, QUrl
 from PyQt6.QtGui import QCursor, QDesktopServices, QIcon
-from PyQt6.QtWidgets import (QHBoxLayout, QLabel, QLineEdit, QPushButton,
-                             QVBoxLayout, QWidget)
+from PyQt6.QtWidgets import (
+    QHBoxLayout,
+    QLabel,
+    QLineEdit,
+    QPushButton,
+    QVBoxLayout,
+    QWidget,
+)
 
 from speed_typing_game import config
 
 # translate = QtCore.QCoreApplication.translate
 update_timer_interval = 200
-game_duration = 20*1000
+game_duration = 20 * 1000
 BACKSPACE_KEY = 16777219
 DELETE_KEY = 16777223
 X_KEY = 88
@@ -20,6 +26,7 @@ V_KEY = 86
 TAKEBACK_KEYS = [BACKSPACE_KEY, DELETE_KEY]
 CUT_KEYS = [X_KEY, V_KEY]
 CTRL_MODIFIER = 2
+
 
 class InputLabel(QLabel):
     def __init__(self, width=600):
@@ -41,8 +48,9 @@ class InputLabel(QLabel):
         # TODO: hide prev. line, set cursor, show new text
         pass
 
+
 class CustomLineEdit(QLineEdit):
-    def __init__(self, parent, allow_takeback = False, *args, **kwargs):
+    def __init__(self, parent, allow_takeback=False, *args, **kwargs):
         self.logger = logging.getLogger(__name__)
         self.allow_takeback = allow_takeback
         super().__init__(*args, **kwargs)
@@ -51,10 +59,17 @@ class CustomLineEdit(QLineEdit):
         key = event.key()
         modifier = event.nativeModifiers()
         window = self.parent()
-        self.logger.debug(f"Detected keyPressEvent: key {key} {'with a modifier:'+ modifier if modifier else ''}")
-        is_cutpaste_event = (modifier==CTRL_MODIFIER and key in CUT_KEYS)
-        if (not self.allow_takeback) and (key in TAKEBACK_KEYS or is_cutpaste_event):
-            self.logger.debug(f"Skipped takeback event: takeback is not allowed")
+        modifier_message = "with a modifier:" + modifier if modifier else ""
+        self.logger.debug(
+            f"Detected keyPressEvent: key {key} {modifier_message}"
+        )
+        is_cutpaste_event = modifier == CTRL_MODIFIER and key in CUT_KEYS
+        if (not self.allow_takeback) and (
+            key in TAKEBACK_KEYS or is_cutpaste_event
+        ):
+            self.logger.debug(
+                "Skipped takeback event: takeback is not allowed"
+            )
             return
         if not window.game_in_progress:
             window.start_game()
@@ -89,8 +104,10 @@ is a multi-line text"
 
         self.mainLayout = QVBoxLayout()
         self.setLayout(self.mainLayout)
-        standout_color = self.palette['--standout-color']
-        self.title = QLabel(f"<font color='{standout_color}'>Simply</font>Type")
+        standout_color = self.palette["--standout-color"]
+        self.title = QLabel(
+            f"<font color='{standout_color}'>Simply</font>Type"
+        )
         self.title.setProperty("class", "heading")
         self.timer_label = QLabel()
         sp_retain = self.timer_label.sizePolicy()
@@ -183,14 +200,17 @@ is a multi-line text"
         pos = self.pos
         self.pos += 1
         char_correct = self.words[pos]
-        self.logger.debug(f"Typed in '{char}' - correct answer'{char_correct}' - position {pos}")
-        if char_correct == char:                # correct character typed
+        self.logger.debug(
+            f"Typed in '{char}' - correct answer'{char_correct}'\
+ - position {pos}"
+        )
+        if char_correct == char:  # correct character typed
             color = self.palette["--foreground-selected-color"]
             if char in self.correct_chars.keys():
                 self.correct_chars[char] += 1
             else:
                 self.correct_chars[char] = 1
-        else:                                       # incorrect character typed
+        else:  # incorrect character typed
             color = self.palette["--error-color"]
             if char in self.incorrect_chars.keys():
                 self.incorrect_chars[char] += 1
@@ -203,7 +223,7 @@ is a multi-line text"
         new_char = self.set_html_color(char, color)
         self.typed_in.append(new_char)
         self.words_to_type_label.setText(
-            "".join(self.typed_in) + self.words[self.pos:]
+            "".join(self.typed_in) + self.words[self.pos :]
         )
 
     @staticmethod
@@ -217,14 +237,30 @@ is a multi-line text"
         return "".join(words)
 
     def retranslate(self):
-        self.button_reset.setText(QCoreApplication.translate("QPushButton", "Reset"))
-        self.button_settings.setText(QCoreApplication.translate("QPushButton", "Settings"))
-        self.button_stats.setText(QCoreApplication.translate("QPushButton", "Stats"))
-        self.button_about.setText(QCoreApplication.translate("QPushButton", "About"))
-        self.button_menu1.setText(QCoreApplication.translate("QPushButton", "Language"))
-        self.button_menu2.setText(QCoreApplication.translate("QPushButton", "Mode"))
-        self.button_menu3.setText(QCoreApplication.translate("QPushButton", "Duration"))
-        self.button_exit.setText(QCoreApplication.translate("QPushButton", "Exit"))
+        self.button_reset.setText(
+            QCoreApplication.translate("QPushButton", "Reset")
+        )
+        self.button_settings.setText(
+            QCoreApplication.translate("QPushButton", "Settings")
+        )
+        self.button_stats.setText(
+            QCoreApplication.translate("QPushButton", "Stats")
+        )
+        self.button_about.setText(
+            QCoreApplication.translate("QPushButton", "About")
+        )
+        self.button_menu1.setText(
+            QCoreApplication.translate("QPushButton", "Language")
+        )
+        self.button_menu2.setText(
+            QCoreApplication.translate("QPushButton", "Mode")
+        )
+        self.button_menu3.setText(
+            QCoreApplication.translate("QPushButton", "Duration")
+        )
+        self.button_exit.setText(
+            QCoreApplication.translate("QPushButton", "Exit")
+        )
         self.description_label.setText(
             QCoreApplication.translate("Qlabel", "Begin typing to start")
         )
@@ -260,11 +296,16 @@ is a multi-line text"
         if self.game_in_progress:
             self.end_time = time.time()
             time_elapsed = self.end_time - self.start_time
-            self.logger.info(f"Finished game: time elapsed {time_elapsed:.2f}s - characters typed {self.pos}")
+            self.logger.info(
+                f"Finished game: time elapsed {time_elapsed:.2f}s\
+ - characters typed {self.pos}"
+            )
             self.update_timer.stop()
             self.save_results()
             self.words_input.clear()
-            self.words_to_type_label.setText(self.words) # TODO: do this after results shown
+            self.words_to_type_label.setText(
+                self.words
+            )  # TODO: do this after results shown
 
             # self.sidebarLayout.show()
             # self.menuLayout.show()
@@ -291,7 +332,7 @@ is a multi-line text"
             self.cur_char = self.words[0]
 
     def update_timer_label(self):
-        self.timer_label.setText(str(int(self.timer.remainingTime()//1000)))
+        self.timer_label.setText(str(int(self.timer.remainingTime() // 1000)))
 
     def save_results(self):
         pass
