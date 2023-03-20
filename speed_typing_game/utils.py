@@ -1,8 +1,7 @@
 import json
-import os
 import logging
+import os
 from datetime import datetime as dt
-import subprocess
 
 import speed_typing_game.config as config
 
@@ -35,6 +34,7 @@ def get_color_palette(palette_name, theme):
         with open(palette_path, "r") as f:
             return json.load(f)
 
+
 def setup_logging(log_destination, log_level):
     timestamp = dt.now().strftime("%Y-%m-%d_%H-%M-%S")
     log_filename = os.path.join(config.LOG_DIR, f"{timestamp}.log")
@@ -52,6 +52,7 @@ def setup_logging(log_destination, log_level):
         handlers=handlers,
     )
 
+
 def detect_dark_theme_os():
     themes = ["dark", "light"]
     # TODO: other platforms
@@ -62,13 +63,15 @@ def detect_dark_theme_os():
         logger.debug(f"Detected theme: {themes[is_dark_theme]}")
         return themes[is_dark_theme]
     registry = winreg.ConnectRegistry(None, winreg.HKEY_CURRENT_USER)
-    reg_keypath = r'SOFTWARE\Microsoft\Windows\CurrentVersion\Themes\Personalize'
+    reg_keypath = (
+        r"SOFTWARE\Microsoft\Windows\CurrentVersion\Themes\Personalize"
+    )
     try:
         reg_key = winreg.OpenKey(registry, reg_keypath)
         for i in range(1024):
             try:
                 value_name, value, _ = winreg.EnumValue(reg_key, i)
-                if value_name == 'AppsUseLightTheme':
+                if value_name == "AppsUseLightTheme":
                     print(value)
                     is_dark_theme = value
             except OSError:
