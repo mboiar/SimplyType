@@ -1,42 +1,55 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!DOCTYPE TS>
-<TS version="2.1" language="pl" sourcelanguage="en">
-  <context>
+<TS version="2.1" language="pl">
+<context>
     <name>QPushButton</name>
     <message>
-      <location filename="..\..\main.py" line="38" />
-      <source>Restart</source>
-      <translation>Ponów próbę</translation>
+        <location filename="../../views.py" line="220"/>
+        <source>Reset</source>
+        <translation>Zresetuj</translation>
     </message>
     <message>
-      <location filename="..\..\main.py" line="44" />
-      <source>Settings</source>
-      <translation>Ustawienia</translation>
+        <location filename="../../views.py" line="221"/>
+        <source>Settings</source>
+        <translation>Ustawienia</translation>
     </message>
     <message>
-      <location filename="..\..\main.py" line="45" />
-      <source>About</source>
-      <translation>O programie</translation>
+        <location filename="../../views.py" line="222"/>
+        <source>Stats</source>
+        <translation>Statystyki</translation>
     </message>
     <message>
-      <location filename="..\..\main.py" line="46" />
-      <source>Stats</source>
-      <translation>Statystyki</translation>
+        <location filename="../../views.py" line="223"/>
+        <source>About</source>
+        <translation>O grze</translation>
     </message>
     <message>
-      <location filename="..\..\main.py" line="50" />
-      <source>Language</source>
-      <translation>Język</translation>
+        <location filename="../../views.py" line="224"/>
+        <source>Language</source>
+        <translation>Język</translation>
     </message>
     <message>
-      <location filename="..\..\main.py" line="51" />
-      <source>Mode</source>
-      <translation>Tryb gry</translation>
+        <location filename="../../views.py" line="225"/>
+        <source>Mode</source>
+        <translation>Tryb</translation>
     </message>
     <message>
-      <location filename="..\..\main.py" line="52" />
-      <source>Duration</source>
-      <translation>Okres</translation>
+        <location filename="../../views.py" line="226"/>
+        <source>Duration</source>
+        <translation>Czas</translation>
     </message>
-  </context>
+    <message>
+        <location filename="../../views.py" line="227"/>
+        <source>Exit</source>
+        <translation>Zakończ</translation>
+    </message>
+</context>
+<context>
+    <name>Qlabel</name>
+    <message>
+        <location filename="../../views.py" line="229"/>
+        <source>Begin typing to start</source>
+        <translation>Zacznij pisać aby rozpocząć</translation>
+    </message>
+</context>
 </TS>

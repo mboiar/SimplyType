@@ -9,5 +9,5 @@ SUPPORTED_LOCALE = ["pl_PL", "en_US"]
 ICON_FILENAME = "icon-vscode.png"
 LOGGING_LEVEL = logging.DEBUG
 LOG_PATH = "logs"
-COLOR_PALETTE = 'pastel'
-COLOR_THEME = 'dark'
+COLOR_PALETTE = "vscode"
+COLOR_THEME = "dark"
