@@ -9,20 +9,6 @@ import speed_typing_game.config as config
 from speed_typing_game.views import MainWindow
 from speed_typing_game.utils import setup_logging, set_stylesheet, detect_dark_theme_os, get_color_palette
 
-def setup_logging(log_destination, log_level):
-    timestamp = dt.now().strftime("%Y-%m-%d_%H-%M-%S")
-    log_filename = os.path.join(config.LOG_PATH, f"{timestamp}.log")
-    handlers = []
-    if log_destination in ["console", "both"]:
-        handlers.append(logging.StreamHandler())
-    if log_destination in ["file", "both"]:
-        handlers.append(logging.FileHandler(filename=log_filename, mode="x"))
-
-    logging.basicConfig(
-        format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
-        level=log_level,
-        handlers=handlers,
-    )
 
 def main():
     setup_logging("console", config.LOGGING_LEVEL)

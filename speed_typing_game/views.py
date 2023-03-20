@@ -3,15 +3,14 @@ import time
 import logging
 
 import PyQt6.QtCore as QtCore
-from PyQt6.QtCore import Qt, QUrl
+from PyQt6.QtCore import Qt, QUrl, QCoreApplication
 from PyQt6.QtGui import QCursor, QDesktopServices, QIcon
 from PyQt6.QtWidgets import (QHBoxLayout, QLabel, QLineEdit, QPushButton,
                              QVBoxLayout, QWidget)
 
 from speed_typing_game import config
-from speed_typing_game.utils import get_color_palette
 
-_translate = QtCore.QCoreApplication.translate
+# translate = QtCore.QCoreApplication.translate
 update_timer_interval = 200
 game_duration = 20*1000
 BACKSPACE_KEY = 16777219
@@ -218,16 +217,16 @@ is a multi-line text"
         return "".join(words)
 
     def retranslate(self):
-        self.button_reset.setText(_translate("QPushButton", "reset"))
-        self.button_settings.setText(_translate("QPushButton", "Settings"))
-        self.button_stats.setText(_translate("QPushButton", "Stats"))
-        self.button_about.setText(_translate("QPushButton", "About"))
-        self.button_menu1.setText(_translate("QPushButton", "Language"))
-        self.button_menu2.setText(_translate("QPushButton", "Mode"))
-        self.button_menu3.setText(_translate("QPushButton", "Duration"))
-        self.button_exit.setText(_translate("QPushButton", "Exit"))
+        self.button_reset.setText(QCoreApplication.translate("QPushButton", "Reset"))
+        self.button_settings.setText(QCoreApplication.translate("QPushButton", "Settings"))
+        self.button_stats.setText(QCoreApplication.translate("QPushButton", "Stats"))
+        self.button_about.setText(QCoreApplication.translate("QPushButton", "About"))
+        self.button_menu1.setText(QCoreApplication.translate("QPushButton", "Language"))
+        self.button_menu2.setText(QCoreApplication.translate("QPushButton", "Mode"))
+        self.button_menu3.setText(QCoreApplication.translate("QPushButton", "Duration"))
+        self.button_exit.setText(QCoreApplication.translate("QPushButton", "Exit"))
         self.description_label.setText(
-            _translate("Qlabel", "Begin typing to start")
+            QCoreApplication.translate("Qlabel", "Begin typing to start")
         )
 
     def start_game(self):
