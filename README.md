@@ -2,6 +2,8 @@
 
 A cross-platform typing game with a clean GUI interface.
 
+![main window](https://github.com/mboiar/speed-typing-game/blob/main/modes.png?raw=true)
+
 ## Features
 
 - different game modes
