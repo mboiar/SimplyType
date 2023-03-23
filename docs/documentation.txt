@@ -11,3 +11,5 @@ Stworzono interfejs GUI dla okna głównego aplikacji oraz zaimplementowano wali
 
 19.03.2023 - Maksym Boiar - rejestracja zdarzeń + proces gry
 Dodano rejestrację przebiegu działania programu (logging) i zaimplementowano rozpoczęcie/zakończenie gry
+
+23.03.2023 - Filip Chałupka - Dodano koncepcje ekranu ustawień gry i przykładowe przejscia pomiędzy interfejsami.
