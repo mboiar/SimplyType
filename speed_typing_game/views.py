@@ -1,18 +1,21 @@
+"""
+Classes:
+
+    MainTypingArea(QLineEdit)
+    MainWindow(QWidget)
+
+"""
+
 import logging
 import sys
 import time
 
 import PyQt6.QtCore as QtCore
 from PyQt6.QtCore import QCoreApplication, Qt, QUrl
-from PyQt6.QtGui import QCursor, QDesktopServices, QIcon
-from PyQt6.QtWidgets import (
-    QHBoxLayout,
-    QLabel,
-    QLineEdit,
-    QPushButton,
-    QVBoxLayout,
-    QWidget,
-)
+from PyQt6.QtGui import (QCursor, QDesktopServices, QIcon, QKeyEvent,
+                         QMouseEvent)
+from PyQt6.QtWidgets import (QHBoxLayout, QLabel, QLineEdit, QPushButton,
+                             QVBoxLayout, QWidget)
 
 from speed_typing_game import config
 
@@ -28,56 +31,10 @@ CUT_KEYS = [X_KEY, V_KEY]
 CTRL_MODIFIER = 2
 
 
-class InputLabel(QLabel):
-    def __init__(self, width=600):
-        super().__init__()
-        self.cursor_pos = (0, 0, 5, 10)  # TODO: use fontmetrics
-        self.cursor = QtCore.QRect(*(self.cursor_pos))
-        self.text = ""
-        self.max_chars = 80 * 3  # TODO: set based on width
-        self.setText(self.text[: self.max_chars])
-        self.incorrect_chars = {}
-        self.correct_chars = {}
-        self.pos = 0
-
-    def redraw(self, width):
-        """Change displayed word count if width/font changed"""
-        pass
-
-    def newline(self):
-        # TODO: hide prev. line, set cursor, show new text
-        pass
-
-
-class CustomLineEdit(QLineEdit):
-    def __init__(self, parent, allow_takeback=False, *args, **kwargs):
-        self.logger = logging.getLogger(__name__)
-        self.allow_takeback = allow_takeback
-        super().__init__(*args, **kwargs)
-
-    def keyPressEvent(self, event):
-        key = event.key()
-        modifier = event.nativeModifiers()
-        window = self.parent()
-        modifier_message = "with a modifier:" + modifier if modifier else ""
-        self.logger.debug(
-            f"Detected keyPressEvent: key {key} {modifier_message}"
-        )
-        is_cutpaste_event = modifier == CTRL_MODIFIER and key in CUT_KEYS
-        if (not self.allow_takeback) and (
-            key in TAKEBACK_KEYS or is_cutpaste_event
-        ):
-            self.logger.debug(
-                "Skipped takeback event: takeback is not allowed"
-            )
-            return
-        if not window.game_in_progress:
-            window.start_game()
-        super().keyPressEvent(event)
-
-
 class MainWindow(QWidget):
-    def __init__(self, palette_name, icon):
+    """A class representing main window of the game."""
+
+    def __init__(self, palette_name: str, icon: QIcon) -> None:
         super().__init__()
         self.logger = logging.getLogger(__name__)
         self.words = "words will appear here you can see that this\
@@ -95,7 +52,8 @@ is a multi-line text"
         self.icon = icon
         self.init_window()
 
-    def init_window(self):
+    def init_window(self) -> None:
+        """Initialize main window GUI"""
         self.logger.debug("Initialized main window")
         self.resize(900, 500)
         self.setWindowTitle(config.PROJECT_NAME)
@@ -116,7 +74,7 @@ is a multi-line text"
         self.timer_label.setProperty("class", "highlighted")
 
         self.input_label = InputLabel()
-        self.words_input = CustomLineEdit(self)
+        self.words_input = MainTypingArea(self)
         self.words_input.textEdited.connect(self.validate_character)
         self.button_reset = QPushButton()
 
@@ -184,23 +142,26 @@ is a multi-line text"
 
         self.button_reset.clicked.connect(self.reset_game)
         self.button_exit.clicked.connect(self.close)
-        self.words_to_type_label.mousePressEvent = self.focus_input
+        self.words_to_type_label.mousePressEvent = self.set_focus
 
         self.retranslate()
 
-    def focus_input(self, *args):
+    @staticmethod
+    def open_hyperlink(linkStr: str) -> bool:
+        return QDesktopServices.openUrl(QUrl(linkStr))
+
+    def set_focus(self, event: QMouseEvent = None) -> None:
         self.words_input.setFocus()
 
-    def open_hyperlink(self, linkStr):
-        QDesktopServices.openUrl(QUrl(linkStr))
-
-    def reset_game(self):
+    def reset_game(self) -> None:
         self.logger.debug("Reset game")
         self.end_game()
-        self.focus_input()
+        self.set_focus()
 
-    def validate_character(self, key):
-        char = self.words_input.text()[-1]
+    def validate_character(self, text: str) -> None:
+        """Process user input during a game."""
+        # char = self.words_input.text()[-1]
+        char = text[-1]
         pos = self.pos
         self.pos += 1
         char_correct = self.words[pos]
@@ -231,16 +192,16 @@ is a multi-line text"
         )
 
     @staticmethod
-    def set_html_color(text, color):
+    def set_html_color(text: str, color: str) -> str:
         return f'<span style="color: {color};">{text}</span>'
 
-    def get_words_subset(self):
+    def get_words_subset(self) -> str:
         """Get a subset of words that will immediately appear on screen."""
         # TODO
         words = self.words
         return "".join(words)
 
-    def retranslate(self):
+    def retranslate(self) -> None:
         self.button_reset.setText(
             QCoreApplication.translate("QPushButton", "Reset")
         )
@@ -269,7 +230,7 @@ is a multi-line text"
             QCoreApplication.translate("Qlabel", "Begin typing to start")
         )
 
-    def start_game(self):
+    def start_game(self) -> None:
         mode = None
         time_ = None
         self.logger.info(f"Started game: mode {mode} - time {time_}")
@@ -293,10 +254,10 @@ is a multi-line text"
 
         self.start_time = time.time()
 
-    def display_results(self):
+    def display_results(self) -> None:
         pass
 
-    def end_game(self):
+    def end_game(self) -> None:
         if self.game_in_progress:
             self.end_time = time.time()
             time_elapsed = self.end_time - self.start_time
@@ -333,13 +294,75 @@ is a multi-line text"
             self.incorrect_chars = {}
             self.correct_chars = {}
             self.cur_char = self.words[0]
-            self.focus_input()
+            self.set_focus()
 
-    def update_timer_label(self):
+    def update_timer_label(self) -> None:
         self.timer_label.setText(str(int(self.timer.remainingTime() // 1000)))
 
-    def save_results(self):
+    def save_results(self) -> None:
         pass
 
-    def close(self):
+    def close(self) -> None:
         sys.exit()
+
+
+class MainTypingArea(QLineEdit):
+    """A class representing a typing area in the game."""
+
+    def __init__(
+        self, parent: MainWindow, allow_takeback: bool = False, *args, **kwargs
+    ) -> None:
+        """
+        Parameters
+        ----------
+        parent : MainWindow
+            Parent window, used to start the game on keyPressEvent
+        allow_takeback : bool, optional
+            Boolean value that determines whether re-typing text is allowed during a game
+        """
+
+        self.logger = logging.getLogger(__name__)
+        self.allow_takeback = allow_takeback
+        super().__init__(*args, **kwargs)
+
+    def keyPressEvent(self, event: QKeyEvent) -> None:
+        """Process and filter user input, then call default (overrided) method."""
+        key = event.key()
+        modifier = event.nativeModifiers()
+        window = self.parent()
+        modifier_message = "with a modifier:" + modifier if modifier else ""
+        self.logger.debug(
+            f"Detected keyPressEvent: key {key} {modifier_message}"
+        )
+        is_cutpaste_event = modifier == CTRL_MODIFIER and key in CUT_KEYS
+        if (not self.allow_takeback) and (
+            key in TAKEBACK_KEYS or is_cutpaste_event
+        ):
+            self.logger.debug(
+                "Skipped takeback event: takeback is not allowed"
+            )
+            return
+        if not window.game_in_progress:
+            window.start_game()
+        super().keyPressEvent(event)
+
+
+class InputLabel(QLabel):
+    def __init__(self, width=600):
+        super().__init__()
+        self.cursor_pos = (0, 0, 5, 10)  # TODO: use fontmetrics
+        self.cursor = QtCore.QRect(*(self.cursor_pos))
+        self.text = ""
+        self.max_chars = 80 * 3  # TODO: set based on width
+        self.setText(self.text[: self.max_chars])
+        self.incorrect_chars = {}
+        self.correct_chars = {}
+        self.pos = 0
+
+    def redraw(self, width):
+        """Change displayed word count if width/font changed"""
+        pass
+
+    def newline(self):
+        # TODO: hide prev. line, set cursor, show new text
+        pass

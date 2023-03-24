@@ -1,16 +1,37 @@
+"""
+Define utility functions.
+
+Functions:
+
+    set_stylesheet(QApplication, str, str) -> None
+    get_color_palette_names(str) -> List[str]
+    get_color_palette(str, str) -> Dict
+    setup_logging(str, Union[int, str]) -> None
+    create_connection(str) -> bool
+    detect_dark_theme_os() -> str
+
+"""
+
 import json
 import logging
 import os
 from datetime import datetime as dt
+from typing import Dict, List, Union
+
+from PyQt6.QtSql import QSqlDatabase
+from PyQt6.QtWidgets import QApplication, QMessageBox
 
 import speed_typing_game.config as config
 
 logger = logging.getLogger(__name__)
 
 
-def set_stylesheet(app, palette_name, theme):
+def set_stylesheet(app: QApplication, palette_name: str, theme: str) -> None:
+    """Set stylesheet with a given palette on the application."""
     palette = get_color_palette(palette_name, theme)
-    template_path = os.path.join(config.RESOURCES_DIR, "styles", "template.css")
+    template_path = os.path.join(
+        config.RESOURCES_DIR, "styles", "template.css"
+    )
     with open(template_path, "r") as main_f:
         style_sheet = main_f.read()
         for color_var in palette.keys():
@@ -20,22 +41,33 @@ def set_stylesheet(app, palette_name, theme):
         logger.info(f"Set palette: {palette_name}")
         app.setStyleSheet(style_sheet)
 
-def get_color_palette_names(theme):
+
+def get_color_palette_names(theme: str) -> List[str]:
+    """Retrieve available palette names for a dark or light theme."""
     theme_path = os.path.join(config.RESOURCES_DIR, "styles", theme)
     palette_names = [d for d in os.listdir(theme_path)]
-    logger.debug(f"Retrieved available palette names for {theme} theme: {palette_names}")
+    logger.debug(
+        f"Retrieved available palette names for {theme} theme: {palette_names}"
+    )
     return palette_names
 
-def get_color_palette(palette_name, theme):
-    palette_path = os.path.join(config.RESOURCES_DIR, "styles", theme, palette_name, "colors.json")
+
+def get_color_palette(palette_name: str, theme: str) -> Dict:
+    """Retrieve a dict with colors for a given palette name."""
+    palette_path = os.path.join(
+        config.RESOURCES_DIR, "styles", theme, palette_name, "colors.json"
+    )
     if not os.path.exists(palette_path):
-        raise FileNotFoundError(f"Palette {palette_name} with theme {theme} does not exist.")
+        raise FileNotFoundError(
+            f"Palette {palette_name} with theme {theme} does not exist."
+        )
     else:
         with open(palette_path, "r") as f:
             return json.load(f)
 
 
-def setup_logging(log_destination, log_level):
+def setup_logging(log_destination: str, log_level: Union[int, str]) -> None:
+    """Setup console and/or file loggers to be used throughout application."""
     timestamp = dt.now().strftime("%Y-%m-%d_%H-%M-%S")
     log_filename = os.path.join(config.LOG_DIR, f"{timestamp}.log")
     handlers = []
@@ -53,8 +85,36 @@ def setup_logging(log_destination, log_level):
     )
 
 
-def detect_dark_theme_os():
-    themes = ["dark", "light"]
+def create_connection(db_name: str) -> bool:
+    """Create and open a SQLite database connection."""
+    con = QSqlDatabase.addDatabase("QSQLITE")
+    con.setDatabaseName(db_name)
+
+    if not con.open():
+        QMessageBox.critical(
+            None,
+            f"{config.PROJECT_NAME} - Error!",
+            "Database Error: %s" % con.lastError().databaseText(),
+        )
+        logger.critical("Unable to connect to the database")
+        return False
+    return True
+
+
+def get_supported_locale() -> List[str]:
+    translation_path = os.path.join(config.RESOURCES_DIR, "translate")
+    locale_names = [
+        n.removesuffix(".qm")
+        for n in os.listdir(translation_path)
+        if n.endswith(".qm")
+    ] + ["en_US"]
+    logger.debug(f"Retrieved available locale names: {locale_names}")
+    return locale_names
+
+
+def detect_dark_theme_os() -> str:
+    """Attempt to determine if user's OS theme is dark (default: dark)."""
+    themes = ["light", "dark"]
     # TODO: other platforms
     is_dark_theme = True
     try:
