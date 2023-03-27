@@ -17,3 +17,7 @@ COLOR_THEME = "dark"
 DEFAULT_LOCALE = "en_US"
 # STATS_DB = os.path.join(RESOURCES_DIR, "stats.sqlite")
 DB = os.path.join(RESOURCES_DIR, "db.sqlite")
+WORDSET_TABLE = "wordsets"
+WORD_TABLE = "words"
+CON_NAME = "words"
+GAME_TABLE = "games"

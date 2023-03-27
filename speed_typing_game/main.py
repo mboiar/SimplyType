@@ -27,13 +27,12 @@ def main() -> None:
     setup_logging("console", config.LOGGING_LEVEL)
     logger = logging.getLogger(__name__)
     app = QApplication(sys.argv)
-
-    if not create_connection(config.DB):
+    if not create_connection(config.DB, config.CON_NAME):
         sys.exit(1)
 
     translator = QtCore.QTranslator()
     # system_locale = QtCore.QLocale.system().name()
-    locale = get_supported_locale()[1]
+    locale = get_supported_locale()[0]
     # locale = "pl_PL"
     if translator.load(locale + ".qm", config.RESOURCES_DIR + "/translate/"):
         app.installTranslator(translator)
@@ -44,8 +43,8 @@ def main() -> None:
     # theme =  detect_dark_theme_os()
     theme = "dark"
     palette_name = get_color_palette_names(theme)[0]
-    palette = get_color_palette(palette_name, theme)
-    set_stylesheet(app, palette_name, theme)
+    palette = get_color_palette(theme, palette_name)
+    set_stylesheet(app, theme, palette_name)
     icon = QIcon(
         os.path.join(
             config.RESOURCES_DIR, "styles", theme, palette_name, "icon.png"

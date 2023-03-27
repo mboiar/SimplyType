@@ -19,16 +19,16 @@ from datetime import datetime as dt
 from typing import Dict, List, Union
 
 from PyQt6.QtSql import QSqlDatabase
-from PyQt6.QtWidgets import QApplication, QMessageBox
+from PyQt6.QtWidgets import QWidget, QMessageBox
 
 import speed_typing_game.config as config
 
 logger = logging.getLogger(__name__)
 
 
-def set_stylesheet(app: QApplication, palette_name: str, theme: str) -> None:
-    """Set stylesheet with a given palette on the application."""
-    palette = get_color_palette(palette_name, theme)
+def set_stylesheet(widget: QWidget, theme: str, palette_name: str = None) -> None:
+    """Set stylesheet with a given palette on the widget."""
+    palette = get_color_palette(theme, palette_name)
     template_path = os.path.join(
         config.RESOURCES_DIR, "styles", "template.css"
     )
@@ -39,7 +39,11 @@ def set_stylesheet(app: QApplication, palette_name: str, theme: str) -> None:
                 f"var({color_var})", '"' + palette[color_var] + '"'
             )
         logger.info(f"Set palette: {palette_name}")
-        app.setStyleSheet(style_sheet)
+        widget.setStyleSheet(style_sheet)
+    current_palette = widget.palette()
+    # TODO: modify palette
+    # current_palette.setColorGroup()
+    widget.setPalette(current_palette)
 
 
 def get_color_palette_names(theme: str) -> List[str]:
@@ -52,18 +56,22 @@ def get_color_palette_names(theme: str) -> List[str]:
     return palette_names
 
 
-def get_color_palette(palette_name: str, theme: str) -> Dict:
+def get_color_palette(theme: str, palette_name: str) -> Dict:
     """Retrieve a dict with colors for a given palette name."""
     palette_path = os.path.join(
         config.RESOURCES_DIR, "styles", theme, palette_name, "colors.json"
     )
     if not os.path.exists(palette_path):
-        raise FileNotFoundError(
-            f"Palette {palette_name} with theme {theme} does not exist."
+        default_palette = get_color_palette_names(theme)[0]
+        palette_path = os.path.join(
+            config.RESOURCES_DIR, "styles", theme, default_palette, "colors.json"
         )
-    else:
-        with open(palette_path, "r") as f:
-            return json.load(f)
+        logger.warning(
+            f"Palette {palette_name} with theme {theme} does not exist.\n\
+                Using palette {default_palette}."
+        )
+    with open(palette_path, "r") as f:
+        return json.load(f)
 
 
 def setup_logging(log_destination: str, log_level: Union[int, str]) -> None:
@@ -85,9 +93,9 @@ def setup_logging(log_destination: str, log_level: Union[int, str]) -> None:
     )
 
 
-def create_connection(db_name: str) -> bool:
+def create_connection(db_name: str, con_name: str) -> bool:
     """Create and open a SQLite database connection."""
-    con = QSqlDatabase.addDatabase("QSQLITE")
+    con = QSqlDatabase.addDatabase("QSQLITE", con_name)
     con.setDatabaseName(db_name)
 
     if not con.open():
