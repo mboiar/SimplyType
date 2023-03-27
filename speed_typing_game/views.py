@@ -347,6 +347,11 @@ is a multi-line text"
 
     def save_results(self) -> None:
         pass
+        # total_characters = self.pos
+        # time_elapsed=self.end_time-self.start_time
+        # self.accuracy= (self.correct_chars/(total_chracters))*100 #celnosc jako ilosc dobrze napisanych znakow przez wszystkie znaki
+        # self.cps =self.total_chracters/time_elapsed #ilosc znakow w czasie calej
+
 
     def close(self) -> None:
         sys.exit()
