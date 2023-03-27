@@ -339,6 +339,11 @@ is a multi-line text"
         self.timer_label.setText(str(int(self.timer.remainingTime() // 1000)))
 
     def save_results(self):
+        total_chracters=self.correct_chars+self.incorrect_chars
+        time_elapsed=self.end_time-self.start_time
+        self.accuracy= (self.correct_chars/(total_chracters))*100 #celnosc jako ilosc dobrze napisanych znakow przez wszystkie znaki
+        self.cps =self.total_chracters/time_elapsed #ilosc znakow w czasie calej
+
         pass
 
     def close(self):
