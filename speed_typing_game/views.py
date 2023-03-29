@@ -9,7 +9,7 @@ Classes:
 import logging
 import sys
 import time
-from typing import List, Dict
+from typing import List, Dict, TypeVar
 
 import PyQt6.QtCore as QtCore
 from PyQt6.QtCore import QCoreApplication, Qt, QUrl, QSettings, QRect
@@ -22,7 +22,6 @@ from PyQt6.QtWidgets import (QHBoxLayout, QLabel, QLineEdit, QPushButton,
 
 from speed_typing_game import config
 from speed_typing_game.utils import set_stylesheet
-from speed_typing_game.database import retrieve_wordset
 from speed_typing_game.models import TypingGame
 
 # translate = QtCore.QCoreApplication.translate
@@ -35,245 +34,6 @@ V_KEY = 86
 TAKEBACK_KEYS = [BACKSPACE_KEY, DELETE_KEY]
 CUT_KEYS = [X_KEY, V_KEY]
 CTRL_MODIFIER = 2
-
-
-class MainWindow(QWidget):
-    """A class representing main window of the game."""
-
-    def __init__(self, palette_name: str, icon: QIcon) -> None:
-        super().__init__()
-        self.logger = logging.getLogger(__name__)
-        self.settings = QSettings("BoiarTech", config.PROJECT_NAME, self)
-        self.timer = QtCore.QTimer()
-        self.update_timer = QtCore.QTimer()
-        self.palette = palette_name
-        self.icon = icon
-        self.mode = "default"
-        self.duration = 30
-        self.init_game()
-        self.init_window()
-
-    def init_window(self) -> None:
-        """Initialize main window GUI"""
-        self.logger.debug("Initialized main window")
-        self.resize(900, 500)
-        self.setWindowTitle(config.PROJECT_NAME)
-        self.setWindowIcon(self.icon)
-
-        self.mainLayout = QVBoxLayout()
-        self.setLayout(self.mainLayout)
-        standout_color = self.palette["--standout-color"]
-        self.title = QLabel(
-            f"<font color='{standout_color}'>Simply</font>Type"
-        )
-        self.title.setProperty("class", "heading")
-        self.timer_label = QLabel()
-        sp_retain = self.timer_label.sizePolicy()
-        sp_retain.setRetainSizeWhenHidden(True)
-        self.timer_label.setSizePolicy(sp_retain)
-        self.timer_label.setObjectName("timer_label")
-        self.timer_label.setProperty("class", "highlighted")
-
-        self.words_input = MainTypingArea(allow_takeback=False, parent=self)
-        self.button_reset = QPushButton()
-
-        self.sidebarLayout = QVBoxLayout()
-        self.button_settings = QPushButton()
-        # self.settings_menu = SettingsMenu(self, CtmWidget())
-        # self.settings_menu.hide()
-        self.button_settings.clicked.connect(self.show_settings)
-        self.button_about = QPushButton()
-        self.button_stats = QPushButton()
-        self.button_stats.setProperty("class", "highlighted")
-        self.button_exit = QPushButton()
-
-        self.menuLayout = QVBoxLayout()
-        self.button_menu1 = QPushButton()
-        # self.button_menu1.setMouseTracking(True)
-        # self.button_menu1.mouse.connect(self.show_menu1)
-        self.button_menu2 = QPushButton()
-        self.button_menu3 = QPushButton()
-        self.menuLayout.addWidget(self.button_menu1)
-        self.menuLayout.addWidget(self.button_menu2)
-        self.menuLayout.addWidget(self.button_menu3)
-
-        text_color = self.palette["--foreground-color"]
-        self.link_github = QLabel(
-            f'<a href="{config.PROJECT_URL}" style="text-decoration:none;\
-            color:{text_color}">{config.PROJECT_VERSION}</a>'
-        )
-        self.link_github.linkActivated.connect(self.open_hyperlink)
-        self.link_github.setObjectName("link_github")
-        self.link_github.setProperty("class", "faded")
-
-        self.words_to_type_label = TypingHintLabel(self.words_input, self)
-        self.words_to_type_label.setWordWrap(True)
-        self.words_to_type_label.setProperty("class", "words_to_type")
-        self.description_label = QLabel()
-        for button in [
-            self.button_about,
-            self.button_menu1,
-            self.button_menu2,
-            self.button_menu3,
-            self.button_reset,
-            self.button_settings,
-            self.button_stats,
-            self.button_exit,
-        ]:
-            button.setCursor(QCursor(Qt.CursorShape.PointingHandCursor))
-
-        self.mainLayout.addWidget(self.title)
-        self.mainLayout.addWidget(self.timer_label)
-        self.timer_label.hide()
-        self.mainLayout.addWidget(self.words_input)
-        # self.mainLayout.addWidget(self.input_label)
-        self.mainLayout.addWidget(self.words_to_type_label)
-        self.mainLayout.addWidget(self.button_reset)
-        self.mainLayout.addWidget(self.description_label)
-
-        self.sidebarLayout = QVBoxLayout()
-        self.sidebarLayout.addWidget(self.button_settings)
-        self.sidebarLayout.addWidget(self.button_about)
-        self.sidebarLayout.addWidget(self.button_stats)
-        self.sidebarLayout.addWidget(self.button_exit)
-        self.sidebarLayout.addWidget(self.link_github)
-
-        self.secondaryLayout = QHBoxLayout()
-        self.secondaryLayout.addLayout(self.menuLayout)
-        self.secondaryLayout.addStretch()
-        self.secondaryLayout.addLayout(self.sidebarLayout)
-        self.mainLayout.addLayout(self.secondaryLayout)
-
-        self.button_reset.clicked.connect(self.reset_game)
-        self.button_exit.clicked.connect(self.close)
-        self.words_to_type_label.mousePressEvent = self.set_focus
-        # self.mainLayout.addWidget(self.settings_menu)
-        # self._settings_popup = QPushButton("Gimme settings")
-        # self.tr = TranslucentWidget(self)
-        self._popframe = None
-        self._popflag = False
-        self.retranslate()
-
-    @staticmethod
-    def open_hyperlink(linkStr: str) -> bool:
-        return QDesktopServices.openUrl(QUrl(linkStr))
-
-    def set_focus(self, event: QMouseEvent = None) -> None:
-        self.words_input.setFocus()
-
-    def resizeEvent(self, event):
-        if self._popflag:
-            self._popframe.move(0, 0)
-            self._popframe.resize(self.width(), self.height())
-
-    def show_settings(self):
-        self._popframe = TranslucentWidget(self)
-        self._popframe.move(0, 0)
-        self._popframe.resize(self.width(), self.height())
-        self._popframe.SIGNALS.CLOSE.connect(self._closepopup)
-        self._popflag = True
-        self._popframe.show()
-
-    def _closepopup(self):
-        self._popframe.close()
-        self._popflag = False
-
-    # def resizeEvent(self, a0: QResizeEvent) -> None:
-    #     self.settings_menu.resize(a0.size())
-    #     a0.accept()
-    #     super().resizeEvent(a0)
-
-    def reset_game(self) -> None:
-        self.logger.debug("Reset game")
-        self.end_game()
-        self.init_game()
-        self.set_focus()
-
-    def retranslate(self) -> None:
-        self.button_reset.setText(
-            QCoreApplication.translate("QPushButton", "Reset")
-        )
-        self.button_settings.setText(
-            QCoreApplication.translate("QPushButton", "Settings")
-        )
-        self.button_stats.setText(
-            QCoreApplication.translate("QPushButton", "Stats")
-        )
-        self.button_about.setText(
-            QCoreApplication.translate("QPushButton", "About")
-        )
-        self.button_menu1.setText(
-            QCoreApplication.translate("QPushButton", "Word set")
-        )
-        self.button_menu2.setText(
-            QCoreApplication.translate("QPushButton", "Mode")
-        )
-        self.button_menu3.setText(
-            QCoreApplication.translate("QPushButton", "Duration")
-        )
-        self.button_exit.setText(
-            QCoreApplication.translate("QPushButton", "Exit")
-        )
-        self.description_label.setText(
-            QCoreApplication.translate("Qlabel", "Begin typing to start")
-        )
-
-    def init_game(self, wordset=None, mode=None, duration=None, seed=None) -> None:
-        self.game = TypingGame(wordset=wordset, mode=mode, duration=duration, seed=seed)
-        self.words_to_type_label.setText(self.game.text)
-
-    def start_game(self) -> None:
-        for button in [
-            self.button_about,
-            self.button_menu1,
-            self.button_menu2,
-            self.button_menu3,
-            self.button_stats,
-        ]:
-            button.hide()
-        self.description_label.hide()
-        self.timer_label.show()
-
-        self.timer.timeout.connect(self.finish_game)
-        self.timer.setSingleShot(True)
-        self.timer.start(self.game.duration)
-        self.update_timer.timeout.connect(self.update_timer_label)
-        self.update_timer.start(update_timer_interval)
-
-        self.game.start_or_resume()
-
-    def display_results(self) -> None:
-        pass
-
-    def finish_game(self) -> None:
-        if not self.game.finish_or_pause():
-            return
-        self.update_timer.stop()
-        self.game.save()
-        self.display_results()
-        self.words_to_type_label.label_caret.move(0,0)
-        self.init_game()
-
-        for button in [
-            self.button_about,
-            self.button_menu1,
-            self.button_menu2,
-            self.button_menu3,
-            # self.button_reset,
-            self.button_settings,
-            self.button_stats,
-            # self.button_exit,
-        ]:
-            button.show()
-        self.timer_label.hide()
-        self.description_label.show()
-        self.set_focus()
-
-    def update_timer_label(self) -> None:
-        self.timer_label.setText(str(int(self.timer.remainingTime() // 1000)))
-
-    def close(self) -> None:
-        sys.exit()
 
 
 class MainTypingArea(QLineEdit):
@@ -392,70 +152,6 @@ class MainTypingArea(QLineEdit):
 #         self.file_select = QFileDialog(self)
 #         self.wordset_options = QButtonGroup()
 
-class SettingsMenu(QWidget):
-    def __init__(self, parent: QWidget, widget: QWidget) -> None:
-        super().__init__(parent)
-        # self.setWindowFlags(self.windowFlags() | QtCore.Qt.WindowState.Dialog)
-        palette = QtGui.QPalette(self.palette())
-        palette.setColor(palette.ColorRole.Window, QtCore.Qt.GlobalColor.transparent)
-        self.setPalette(palette)
-        self.widget = widget
-        self.widget.setParent(self)
-        self.initUI()
-
-    def resizeEvent(self, event):
-        position_x = (self.frameGeometry().width()-self.widget.frameGeometry().width())/2
-        position_y = (self.frameGeometry().height()-self.widget.frameGeometry().height())/2
-
-        self.widget.move(position_x, position_y)
-        event.accept()
-
-    def paintEvent(self, event):
-        painter = QtGui.QPainter()
-        painter.begin(self)
-        painter.setRenderHint(QtGui.QPainter.RenderHints.Antialiasing)
-        painter.fillRect(event.rect(), QtGui.QBrush(QtGui.QColor(0, 0, 0, 127)))
-        painter.end()
-
-    def initUI(self) -> None:
-        pass
-        # self.resize(150, 200)
-
-        # self.theme_switch = QPushButton("Switch")
-        # self.theme_switch.clicked.connect(self.toggle_theme)
-        # self.theme_switch.setStyleSheet("""
-        # <label class="switch">
-        #     <input type="checkbox">
-        #     <span class="slider round"></span>
-        # </label>
-        # """)
-        # self.theme_switch_label = QLabel("Select theme")
-        # self.layout().addWidget(self.theme_switch, 0, 0)
-        # self.layout().addWidget(self.theme_switch_label, 0, 1)
-        # self.retranslateUI()
-
-    def update_position(self) -> None:
-        parent_rect = self.parent().rect()
-        self.setGeometry(parent_rect.width()/2-self.width()/2, parent_rect.height()/2-self.height()/2, self.width(), self.height())
-
-    def resizeEvent(self, a0) -> None:
-        super().resizeEvent(a0)
-        self.update_position()
-
-    def toggle_theme(self) -> None:
-        themes = ['light', 'dark']
-        set_stylesheet(
-            QCoreApplication.instance(),
-            themes[self.theme_switch.isChecked()]
-        )
-
-    def retranslateUI(self) -> None:
-        self.theme_switch_label.setText(
-            QCoreApplication.translate("QLabel", "Select theme")
-        )
-        # self.theme_switch.setText(
-        #     QCoreApplication.translate("QPushButton", "")
-        # )
 
 class TranslucentWidgetSignals(QtCore.QObject):
     # SIGNALS
@@ -469,23 +165,27 @@ class TranslucentWidget(QWidget):
         self.setWindowFlags(QtCore.Qt.WindowFlags.FramelessWindowHint)
         self.setAttribute(QtCore.Qt.WidgetAttribute.WA_TranslucentBackground)
 
-        self.fillColor = QtGui.QColor(30, 30, 30, 120)
-        self.penColor = QtGui.QColor("#333333")
+        self.fillColor = QtGui.QColor(30, 30, 30, 120)         # TODO
+        self.penColor = QtGui.QColor("#333333")                # TODO
 
-        self.popup_fillColor = QtGui.QColor(240, 240, 240, 255)
-        self.popup_penColor = QtGui.QColor(200, 200, 200, 255)
+        # self.popup_fillColor = QtGui.QColor(240, 240, 240, 255)
+        # self.popup_penColor = QtGui.QColor(200, 200, 200, 255)
+        self.popup_fillColor = QtGui.QColor(240, 240, 240, 255) # TODO
+        self.popup_penColor = QtGui.QColor(200, 200, 200, 255)  # TODO
+
 
         self.close_btn = QPushButton(self)
         self.close_btn.setText("x")
         self.close_btn.setCursor(QCursor(Qt.CursorShape.PointingHandCursor))
 
         font = QtGui.QFont()
-        font.setPixelSize(18)
+        font.setPixelSize(12)
         font.setBold(True)
         self.close_btn.setFont(font)
         self.close_btn.setStyleSheet("background-color: rgb(0, 0, 0, 0)")
         self.close_btn.setFixedSize(30, 30)
         self.close_btn.clicked.connect(self._onclose)
+        self.logger = logging.getLogger(__name__)
 
         self.SIGNALS = TranslucentWidgetSignals()
 
@@ -530,25 +230,134 @@ class TranslucentWidget(QWidget):
         qp.end()
 
     def _onclose(self):
-        print("Close")
+        self.logger.debug(f"Closed pop-up {__name__}")
         self.SIGNALS.CLOSE.emit()
 
+class SettingsMenu(TranslucentWidget):
+    def __init__(self, parent: 'MainWindow') -> None:
+        super().__init__(parent)
+        # self.theme_id = False
+        self.initUI()
+
+    def initUI(self) -> None:
+        self.resize(150, 200)
+        self.setLayout(QGridLayout())
+        self.theme_switch = QPushButton("""<label class="switch">
+            <input type="checkbox">
+            <span class="slider round"></span>
+        </label>""")
+        self.theme_switch.clicked.connect(self.toggle_theme)
+        self.theme_switch.setStyleSheet("""
+
+ /* The switch - the box around the slider */
+ .switch {
+    position: relative;
+    display: inline-block;
+    width: 60px;
+    height: 34px;
+  }
+  
+  /* Hide default HTML checkbox */
+  .switch input {
+    opacity: 0;
+    width: 0;
+    height: 0;
+  }
+  
+  /* The slider */
+  .slider {
+    position: absolute;
+    cursor: pointer;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-color: #ccc;
+    -webkit-transition: .4s;
+    transition: .4s;
+  }
+  
+  .slider:before {
+    position: absolute;
+    content: "";
+    height: 26px;
+    width: 26px;
+    left: 4px;
+    bottom: 4px;
+    background-color: white;
+    -webkit-transition: .4s;
+    transition: .4s;
+  }
+  
+  input:checked + .slider {
+    background-color: #2196F3;
+  }
+  
+  input:focus + .slider {
+    box-shadow: 0 0 1px #2196F3;
+  }
+  
+  input:checked + .slider:before {
+    -webkit-transform: translateX(26px);
+    -ms-transform: translateX(26px);
+    transform: translateX(26px);
+  }
+  
+  /* Rounded sliders */
+  .slider.round {
+    border-radius: 34px;
+  }
+  
+  .slider.round:before {
+    border-radius: 50%;
+  } 
+        """)
+        self.theme_switch_label = QLabel()
+        self.layout().addWidget(self.theme_switch, 0, 0)
+        self.layout().addWidget(self.theme_switch_label, 0, 1)
+        self.retranslateUI()
+
+
+    def toggle_theme(self) -> None:
+        themes = ['light', 'dark']
+        # self.theme_id = not self.theme_id
+        set_stylesheet(
+            QCoreApplication.instance(),
+            themes[self.theme_switch.isChecked()]
+        )
+
+    def retranslateUI(self) -> None:
+        self.theme_switch_label.setText(
+            QCoreApplication.translate("QLabel", "Select theme")
+        )
+
+class LanguageMenu(TranslucentWidget):
+    pass
+
+class AboutPage(TranslucentWidget):
+    pass
+
+class DurationMenu(TranslucentWidget):
+    pass
+
+class ModeMenu(TranslucentWidget):
+    pass
 
 class TypingHintLabel(QLabel):
-    def __init__(self, lineedit: QWidget, parent: QWidget = None, *flags):
+    def __init__(self, parent: 'MainWindow' = None, *flags):
         super().__init__(parent, *flags)
         self.logger = logging.getLogger(__name__)
         self.max_chars = 0
         self.text_pos = 0
         self.num_lines = 3
         self.line_pos = 0
-        self.lineedit = lineedit
         self.cur_line = 0
         self._caret = QPixmap(config.RESOURCES_DIR+'/images/cursor.png')
         self.label_caret = QLabel(self)
         self.label_caret.setPixmap(self._caret)
-        self.redraw()
         self.label_caret.hide()
+        self.max_chars_displayed = 0
+        self.redraw()
 
     def setText(self, text: str) -> None:
         super().setText(text) # TODO
@@ -561,14 +370,266 @@ class TypingHintLabel(QLabel):
         self.logger.debug(f"Max chars: {self.max_chars}; label width: {self.label_width}; px_length: {max_px_length}; font width {self.fontMetrics().averageCharWidth()}")
         first_char_ind = self.text_pos - self.max_chars / 2
         last_char_ind = self.text_pos + self.max_chars / 2
-        self.words_displayed = self.parent().words[int(first_char_ind):int(last_char_ind)]
+        if len(self.parent().game.text[int(first_char_ind):int(last_char_ind)]) < self.max_chars_displayed:
+            super().game.extend_text()
+        self.words_displayed = self.parent().game.text[int(first_char_ind):int(last_char_ind)]
         self.setText(self.words_displayed)
         self.label_caret.move(-4, 0)
+        # self.chars_displayed = 0 # TODO
+
+    def paintEvent(self, a0: QtGui.QPaintEvent) -> None:
+        # TODO
+        super().paintEvent(a0)
 
     def newline(self):
         self.setText(self.parent().words[self.parent()._pos:])
+        # TODO
         # self.label_caret.move(-4, 0)
         # if self.cur_line == 0:
         #     y = self.fontMetrics().lineSpacing() + self.fontMetrics().boundingRect(self.)
         #     self.label_caret.move(x, y)
         #     self.cur_line += 1
+
+
+class MainWindow(QWidget):
+    """A class representing main window of the game."""
+
+    def __init__(self, palette_name: str, icon: QIcon) -> None:
+        super().__init__()
+        self.logger = logging.getLogger(__name__)
+        self.settings = QSettings("BoiarTech", config.PROJECT_NAME, self)
+        self.timer = QtCore.QTimer()
+        self.update_timer = QtCore.QTimer()
+        self.palette = palette_name
+        self.icon = icon
+        self.mode = "default"
+        self.duration = 30
+        self.init_game()
+        self.init_window()
+
+    def init_window(self) -> None:
+        """Initialize main window GUI"""
+        self.logger.debug("Initializing main window")
+        self.resize(900, 500)
+        self.setWindowTitle(config.PROJECT_NAME)
+        self.setWindowIcon(self.icon)
+
+        self.mainLayout = QVBoxLayout()
+        self.setLayout(self.mainLayout)
+        standout_color = self.palette["--standout-color"]
+        self.title = QLabel(
+            f"<font color='{standout_color}'>Simply</font>Type"
+        )
+        self.title.setProperty("class", "heading")
+        self.timer_label = QLabel()
+        sp_retain = self.timer_label.sizePolicy()
+        sp_retain.setRetainSizeWhenHidden(True)
+        self.timer_label.setSizePolicy(sp_retain)
+        self.timer_label.setObjectName("timer_label")
+        self.timer_label.setProperty("class", "highlighted")
+
+        self.words_to_type_label = TypingHintLabel(self)
+        self.words_to_type_label.setWordWrap(True)
+        self.words_to_type_label.setProperty("class", "words_to_type")
+        self.words_to_type_label.setText(self.game.text)
+
+        self.words_input = MainTypingArea(self.words_to_type_label, allow_takeback=False, parent=self)
+        self.button_reset = QPushButton()
+
+        self.sidebarLayout = QVBoxLayout()
+        self.button_settings = QPushButton()
+        self.settings_menu = SettingsMenu(self)
+        self.settings_menu.hide()
+        self.button_settings.clicked.connect(self.show_settings)
+        self.button_about = QPushButton()
+        self.button_stats = QPushButton()
+        self.button_stats.setProperty("class", "highlighted")
+        self.button_exit = QPushButton()
+
+        self.menuLayout = QVBoxLayout()
+        self.button_menu1 = QPushButton()
+        # self.button_menu1.setMouseTracking(True)
+        # self.button_menu1.mouse.connect(self.show_menu1)
+        self.button_menu2 = QPushButton()
+        self.button_menu3 = QPushButton()
+        self.menuLayout.addWidget(self.button_menu1)
+        self.menuLayout.addWidget(self.button_menu2)
+        self.menuLayout.addWidget(self.button_menu3)
+
+        text_color = self.palette["--foreground-color"]
+        self.link_github = QLabel(
+            f'<a href="{config.PROJECT_URL}" style="text-decoration:none;\
+            color:{text_color}">{config.PROJECT_VERSION}</a>'
+        )
+        self.link_github.linkActivated.connect(self.open_hyperlink)
+        self.link_github.setObjectName("link_github")
+        self.link_github.setProperty("class", "faded")
+
+        self.description_label = QLabel()
+        for button in [
+            self.button_about,
+            self.button_menu1,
+            self.button_menu2,
+            self.button_menu3,
+            self.button_reset,
+            self.button_settings,
+            self.button_stats,
+            self.button_exit,
+        ]:
+            button.setCursor(QCursor(Qt.CursorShape.PointingHandCursor))
+
+        self.mainLayout.addWidget(self.title)
+        self.mainLayout.addWidget(self.timer_label)
+        self.timer_label.hide()
+        self.mainLayout.addWidget(self.words_input)
+        # self.mainLayout.addWidget(self.input_label)
+        self.mainLayout.addWidget(self.words_to_type_label)
+        self.mainLayout.addWidget(self.button_reset)
+        self.mainLayout.addWidget(self.description_label)
+
+        self.sidebarLayout = QVBoxLayout()
+        self.sidebarLayout.addWidget(self.button_settings)
+        self.sidebarLayout.addWidget(self.button_about)
+        self.sidebarLayout.addWidget(self.button_stats)
+        self.sidebarLayout.addWidget(self.button_exit)
+        self.sidebarLayout.addWidget(self.link_github)
+
+        self.secondaryLayout = QHBoxLayout()
+        self.secondaryLayout.addLayout(self.menuLayout)
+        self.secondaryLayout.addStretch()
+        self.secondaryLayout.addLayout(self.sidebarLayout)
+        self.mainLayout.addLayout(self.secondaryLayout)
+
+        self.button_reset.clicked.connect(self.reset_game)
+        self.button_exit.clicked.connect(self.close)
+        self.words_to_type_label.mousePressEvent = self.set_focus
+        # self.mainLayout.addWidget(self.settings_menu)
+        # self._settings_popup = QPushButton("Gimme settings")
+        # self.tr = TranslucentWidget(self)
+        self._popframe = None
+        self._popflag = False
+        self.retranslate()
+
+    @staticmethod
+    def open_hyperlink(linkStr: str) -> bool:
+        return QDesktopServices.openUrl(QUrl(linkStr))
+
+    def set_focus(self, event: QMouseEvent = None) -> None:
+        self.words_input.setFocus()
+
+    def resizeEvent(self, event):
+        if self._popflag:
+            self._popframe.move(0, 0)
+            self._popframe.resize(self.width(), self.height())
+
+    def show_settings(self) -> None:
+        self.show_popup(self.settings_menu)
+
+    def show_popup(self, popup: TranslucentWidget) -> None:
+        popup.move(0, 0)
+        popup.resize(self.width(), self.height())
+        popup.SIGNALS.CLOSE.connect(self._closepopup)
+        self._popflag = True
+        self.game.finish_or_pause()
+        popup.show()
+        # self._popframe.move(0, 0)
+        # self._popframe.resize(self.width(), self.height())
+        # self._popframe.SIGNALS.CLOSE.connect(self._closepopup)
+        # self._popflag = True
+        # self.game.finish_or_pause()
+        # self._popframe.show()
+
+    def _closepopup(self, popup: TranslucentWidget) -> None:
+        popup.close()
+        self._popflag = False
+
+    def reset_game(self) -> None:
+        self.logger.debug("Reset game")
+        self.finish_game()
+        self.init_game()
+        self.set_focus()
+
+    def retranslate(self) -> None:
+        self.button_reset.setText(
+            QCoreApplication.translate("QPushButton", "Reset")
+        )
+        self.button_settings.setText(
+            QCoreApplication.translate("QPushButton", "Settings")
+        )
+        self.button_stats.setText(
+            QCoreApplication.translate("QPushButton", "Stats")
+        )
+        self.button_about.setText(
+            QCoreApplication.translate("QPushButton", "About")
+        )
+        self.button_menu1.setText(
+            QCoreApplication.translate("QPushButton", "Word set")
+        )
+        self.button_menu2.setText(
+            QCoreApplication.translate("QPushButton", "Mode")
+        )
+        self.button_menu3.setText(
+            QCoreApplication.translate("QPushButton", "Duration")
+        )
+        self.button_exit.setText(
+            QCoreApplication.translate("QPushButton", "Exit")
+        )
+        self.description_label.setText(
+            QCoreApplication.translate("Qlabel", "Begin typing to start")
+        )
+
+    def init_game(self, wordset_id=None, mode=None, duration=None, seed=None) -> None:
+        self.game = TypingGame(wordset_id=wordset_id, mode=mode, duration=duration, seed=seed)
+
+    def start_game(self) -> None:
+        for button in [
+            self.button_about,
+            self.button_menu1,
+            self.button_menu2,
+            self.button_menu3,
+            self.button_stats,
+        ]:
+            button.hide()
+        self.description_label.hide()
+        self.timer_label.show()
+
+        self.timer.timeout.connect(self.finish_game)
+        self.timer.setSingleShot(True)
+        self.timer.start(self.game.duration)
+        self.update_timer.timeout.connect(self.update_timer_label)
+        self.update_timer.start(update_timer_interval)
+
+        self.game.start_or_resume()
+
+    def display_results(self) -> None:
+        pass
+
+    def finish_game(self) -> None:
+        if not self.game.finish_or_pause():
+            return
+        self.update_timer.stop()
+        self.game.save()
+        self.display_results()
+        self.words_to_type_label.label_caret.move(0,0)
+        self.init_game()
+
+        for button in [
+            self.button_about,
+            self.button_menu1,
+            self.button_menu2,
+            self.button_menu3,
+            # self.button_reset,
+            self.button_settings,
+            self.button_stats,
+            # self.button_exit,
+        ]:
+            button.show()
+        self.timer_label.hide()
+        self.description_label.show()
+        self.set_focus()
+
+    def update_timer_label(self) -> None:
+        self.timer_label.setText(str(int(self.timer.remainingTime() // 1000)))
+
+    def close(self) -> None:
+        sys.exit()

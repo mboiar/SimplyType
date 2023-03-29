@@ -19,5 +19,5 @@ DEFAULT_LOCALE = "en_US"
 DB = os.path.join(RESOURCES_DIR, "db.sqlite")
 WORDSET_TABLE = "wordsets"
 WORD_TABLE = "words"
-CON_NAME = "words"
+CON_NAME = "db_con"
 GAME_TABLE = "games"
