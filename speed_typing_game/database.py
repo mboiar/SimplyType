@@ -1,7 +1,5 @@
-import sys
 import os
 from typing import List, Tuple, Iterable
-import random
 import logging
 
 from speed_typing_game import config
@@ -143,15 +141,6 @@ def add_wordsets_to_database(wordsets: Iterable[Tuple[Tuple, Tuple[str]]]) -> bo
         logger.info(f"Added wordsets {names} to database {db.databaseName()}")
     return True
     
-
-def word_combination_with_replacement(wordset: List[str], count: int, seed: int = None) -> Tuple[str]:
-    if wordset is None:
-        logger.warning("Skipping empty wordset")
-        return tuple()
-    word_pool = tuple(wordset)
-    SeededRandom = random.Random(seed)
-    indices = sorted(SeededRandom.choices(range(len(word_pool)), k=count))
-    return tuple(word_pool[i] for i in indices)
 
 def add_games_to_database(games: List[Tuple]) -> bool:
     con_name = config.CON_NAME
