@@ -5,7 +5,6 @@ Classes:
     MainWindow(QWidget)
 
 """
-
 import logging
 import sys
 import time
@@ -40,7 +39,7 @@ class MainTypingArea(QLineEdit):
     """A class representing a typing area in the game."""
 
     def __init__(
-        self, label: QWidget, allow_takeback: bool = False, parent: QWidget = None, *flags
+        self, label: QWidget, allow_takeback: bool = False, parent: 'MainWindow' = None, *flags
     ) -> None:
         """
         Parameters
@@ -67,15 +66,15 @@ class MainTypingArea(QLineEdit):
         char = text[-1]
         pos = game.pos
         self.parent().game.pos += 1
-        char_correct = game.words[pos]
+        char_correct = game.text[pos]
         self.logger.debug(
             f"Typed in '{char}' - correct answer'{char_correct}'\
  - position {pos}"
         )
         if char_correct == char:  # correct character typed
-            color = self.palette["--foreground-selected-color"]
+            color = self.palette().buttonText().color().name()
         else:  # incorrect character typed
-            color = self.palette["--error-color"]
+            color = self.palette().highlight().color().name()
             self.parent().game.incorrect_chars.update(char_correct)
             if char_correct == " ":
                 char = "_"
@@ -95,8 +94,8 @@ class MainTypingArea(QLineEdit):
             else:
                 ch = "_"
             char_width = self.label.fontMetrics().boundingRectChar(ch).width()
-            prev_pos = self.label.label_caret.pos()
-            self.label.label_caret.move(prev_pos.x()+char_width+1, prev_pos.y())
+            # prev_pos = self.label.label_caret.pos()
+            # self.label.label_caret.move(prev_pos.x()+char_width+1, prev_pos.y())
         # super().textEdited(text)
 
     @staticmethod
@@ -122,10 +121,8 @@ class MainTypingArea(QLineEdit):
             )
             return
         elif key in TAKEBACK_KEYS or is_cutpaste_event:
-            self.logger.debug(
-                "Takeback"
-            )
-        if not window.game_in_progress:
+            self.logger.debug("Takeback")
+        if not window.game.in_progress:
             window.start_game()
         self.setReadOnly(False)
         super().keyPressEvent(event)
@@ -348,7 +345,6 @@ class TypingHintLabel(QLabel):
         super().__init__(parent, *flags)
         self.logger = logging.getLogger(__name__)
         self.max_chars = 0
-        self.text_pos = 0
         self.num_lines = 3
         self.line_pos = 0
         self.cur_line = 0
@@ -360,19 +356,22 @@ class TypingHintLabel(QLabel):
         self.redraw()
 
     def setText(self, text: str) -> None:
+        self.logger.debug(f"Setting label text: {text}")
+        text = text[:min(len(text), int(self.max_chars))]
         super().setText(text) # TODO
 
     def redraw(self) -> None:
         """Change displayed word count if width/font changed"""
         self.label_width = self.geometry().width()
         max_px_length = self.label_width * self.num_lines
-        self.max_chars = max_px_length / self.fontMetrics().averageCharWidth()
+        self.max_chars = max_px_length / 1.4#self.fontMetrics().boundingRectChar("m").width()
         self.logger.debug(f"Max chars: {self.max_chars}; label width: {self.label_width}; px_length: {max_px_length}; font width {self.fontMetrics().averageCharWidth()}")
-        first_char_ind = self.text_pos - self.max_chars / 2
-        last_char_ind = self.text_pos + self.max_chars / 2
+        first_char_ind = 0 # self.text_pos - self.max_chars / 2
+        last_char_ind = self.max_chars #self.text_pos + self.max_chars / 2
         if len(self.parent().game.text[int(first_char_ind):int(last_char_ind)]) < self.max_chars_displayed:
             super().game.extend_text()
         self.words_displayed = self.parent().game.text[int(first_char_ind):int(last_char_ind)]
+        self.logger.debug(f"Setting label text: {self.words_displayed}")
         self.setText(self.words_displayed)
         self.label_caret.move(-4, 0)
         # self.chars_displayed = 0 # TODO
@@ -394,17 +393,15 @@ class TypingHintLabel(QLabel):
 class MainWindow(QWidget):
     """A class representing main window of the game."""
 
-    def __init__(self, palette_name: str, icon: QIcon) -> None:
+    def __init__(self, icon: QIcon) -> None:
         super().__init__()
         self.logger = logging.getLogger(__name__)
         self.settings = QSettings("BoiarTech", config.PROJECT_NAME, self)
         self.timer = QtCore.QTimer()
-        self.update_timer = QtCore.QTimer()
-        self.palette = palette_name
         self.icon = icon
         self.mode = "default"
         self.duration = 30
-        self.init_game()
+        self.game = TypingGame()
         self.init_window()
 
     def init_window(self) -> None:
@@ -416,9 +413,8 @@ class MainWindow(QWidget):
 
         self.mainLayout = QVBoxLayout()
         self.setLayout(self.mainLayout)
-        standout_color = self.palette["--standout-color"]
         self.title = QLabel(
-            f"<font color='{standout_color}'>Simply</font>Type"
+            f"<font color='{self.palette().brightText().color().name()}'>Simply</font>Type"
         )
         self.title.setProperty("class", "heading")
         self.timer_label = QLabel()
@@ -431,7 +427,7 @@ class MainWindow(QWidget):
         self.words_to_type_label = TypingHintLabel(self)
         self.words_to_type_label.setWordWrap(True)
         self.words_to_type_label.setProperty("class", "words_to_type")
-        self.words_to_type_label.setText(self.game.text)
+        # self.words_to_type_label.setText(self.game.text)
 
         self.words_input = MainTypingArea(self.words_to_type_label, allow_takeback=False, parent=self)
         self.button_reset = QPushButton()
@@ -456,10 +452,9 @@ class MainWindow(QWidget):
         self.menuLayout.addWidget(self.button_menu2)
         self.menuLayout.addWidget(self.button_menu3)
 
-        text_color = self.palette["--foreground-color"]
         self.link_github = QLabel(
             f'<a href="{config.PROJECT_URL}" style="text-decoration:none;\
-            color:{text_color}">{config.PROJECT_VERSION}</a>'
+            color:{self.palette().text().color().name()}">{config.PROJECT_VERSION}</a>'
         )
         self.link_github.linkActivated.connect(self.open_hyperlink)
         self.link_github.setObjectName("link_github")
@@ -580,6 +575,7 @@ class MainWindow(QWidget):
 
     def init_game(self, wordset_id=None, mode=None, duration=None, seed=None) -> None:
         self.game = TypingGame(wordset_id=wordset_id, mode=mode, duration=duration, seed=seed)
+        self.words_to_type_label.setText(self.game.text)
 
     def start_game(self) -> None:
         for button in [
@@ -593,11 +589,14 @@ class MainWindow(QWidget):
         self.description_label.hide()
         self.timer_label.show()
 
-        self.timer.timeout.connect(self.finish_game)
+        self.timer = QtCore.QTimer()
         self.timer.setSingleShot(True)
+        self.timer.timeout.connect(self.finish_game)
+        self.logger.debug(f"Setting timer for {self.game.duration//1000} s")
         self.timer.start(self.game.duration)
+        self.update_timer = QtCore.QTimer()
         self.update_timer.timeout.connect(self.update_timer_label)
-        self.update_timer.start(update_timer_interval)
+        self.update_timer.start(100)
 
         self.game.start_or_resume()
 
@@ -605,6 +604,7 @@ class MainWindow(QWidget):
         pass
 
     def finish_game(self) -> None:
+        self.logger.debug("Trying to finish game?")
         if not self.game.finish_or_pause():
             return
         self.update_timer.stop()

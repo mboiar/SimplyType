@@ -43,14 +43,15 @@ class Wordset:
             return ()
         word_pool = tuple(self.words)
         SeededRandom = random.Random(seed)
-        indices = sorted(SeededRandom.choices(range(len(word_pool)), k=count))
+        indices = SeededRandom.choices(range(len(word_pool)), k=count)
         return tuple(word_pool[i] for i in indices)
     
     @classmethod
     def from_file(cls, file_path: str) -> 'Wordset':
         logger = logging.getLogger(__name__)
-        with open(file_path, 'r') as file:
+        with open(file_path, 'r', encoding="utf-8") as file:
             data = file.read().split('\n')
+            logger.debug(data)
             if not data:
                 logger.warning(f"Received empty wordset {file_path}")
                 return
@@ -89,24 +90,26 @@ class Wordset:
             logger.error(f"Could not open database connection {con_name}")
             return
         if not database.check_table_exists(wordset_tablename, con_name):
-            logger.error(f"Wordset table does not exist.")
+            logger.error(f"Table '{wordset_tablename}' does not exist.")
             return
         query = QSqlQuery(db)
-        if not query.exec(retrieveWordsetQueryString):
-            logger.error(query.lastError().text())
+        query.setForwardOnly(True)
+        if not query.exec(retrieveWordsetQueryString) or not query.next():
+            logger.error(f"Unable to retrieve wordset {name} from table {wordset_tablename}:\n" + query.lastError().text())
             return
-        query.next()
         id = query.value(0)
         name = query.value(1)
         language = query.value(2)
         difficulty = query.value(3)
+        logger.debug(f"{id} {name} {language} {difficulty}")
 
+        query = QSqlQuery(db)
         retrieveWordQueryString = f"""
             SELECT W.content FROM {config.WORD_TABLE} W
             WHERE W.wordset_id = '{id}'
             """
         if not query.exec(retrieveWordQueryString):
-            logger.error(query.lastError().text())
+            logger.error(f"Unable to retrieve words from table {config.WORD_TABLE}:\n" + query.lastError().text())
             return
         words = []
         while query.next():
@@ -133,14 +136,16 @@ class TypingGame:
             mode: str = "default", 
             pos: int = 0,
             incorrect_chars: str = '',
-            created_at: int = None,
+            elapsed: float = 0,
+            created_at: float = None,
             id: int = None,
             duration: int = 30
     ) -> None:
         self.logger = logging.getLogger(__name__)
         self.seed = seed if seed else time.time()
-        self.wordset = Wordset.from_database(wordset_id)
-        if self.wordset is None:
+        if wordset_id:
+            self.wordset = Wordset.from_database(wordset_id)
+        else:
             ids = Wordset.get_available_ids()
             if not ids:
                 self.logger.error("Found no available wordsets in database")
@@ -149,35 +154,36 @@ class TypingGame:
             self.wordset = Wordset.from_database(wordset_id)
             self.logger.warning(f"Using default wordset {self.wordset}")
         self.text = " ".join(self.wordset.get_subset_with_repetitions(100, self.seed))
+        print(self.text)
         self.pos = pos
         self.mode = mode if mode else 'default'
-        self.duration = duration if duration else 30
+        self.duration = duration if duration else 30*1000
         self.incorrect_chars = Counter(incorrect_chars)
         self.in_progress = False
         self.start_time = created_at
-        self.elapsed = 0
-        self.last_paused = 0
+        self.elapsed = elapsed
+        self.last_paused: float = 0
         self.id = id
         self.logger.info(f"Initializing {self}")
 
     def __str__(self) -> str:
-        return f"Game: wordset {self.wordset}, seed {self.seed}, mode {self.mode}, duration {self.duration}"
+        return f"Game: wordset {self.wordset}, seed {self.seed}, mode {self.mode}, elapsed: {self.elapsed} out of {self.duration}"
     
     def __repr__(self) -> str:
-        return f"Game: wordset {self.wordset}, seed {self.seed}, mode {self.mode}, duration {self.duration}"
+        return f"Game: wordset {self.wordset}, seed {self.seed}, mode {self.mode}, elapsed: {self.elapsed} out of {self.duration}"
 
     @classmethod
     def from_database(cls, id: int = None, created_at: int = None) -> 'TypingGame':
         logger = logging.getLogger(__name__)
         if id:
             retrieveGameQueryString = f"""
-            SELECT id, mode, wordset_id, seed, pos, incorrect_chars, created_at
+            SELECT id, mode, wordset_id, seed, pos, incorrect_chars, elapsed, created_at
             FROM {config.GAME_TABLE} 
             WHERE ID = '{id}'
             """
         elif created_at:
             retrieveGameQueryString = f"""
-            SELECT id, mode, wordset_id, seed, pos, incorrect_chars, created_at
+            SELECT id, mode, wordset_id, seed, pos, incorrect_chars, elapsed, created_at
             FROM {config.GAME_TABLE} 
             WHERE created_at = '{created_at}'
             """
@@ -194,20 +200,21 @@ class TypingGame:
             logger.error(f"Game table does not exist.")
             return
         query = QSqlQuery(db)
-        if not query.exec(retrieveGameQueryString):
+        if not query.exec(retrieveGameQueryString) or not query.next():
             logger.error(f"Unable to retrieve game from table {game_tablename}:\n" + query.lastError().text())
             return
-        query.next()
+        
         id = query.value(0)
         mode = query.value(1)
         wordset_id = query.value(2)
         seed = query.value(3)
         pos = query.value(4)
         incorrect_chars = query.value(5)
-        created_at = query.value(6)
+        elapsed = query.value(6)
+        created_at = query.value(7)
 
         logger.debug(f"Retrieved game created at {created_at} from table {db.databaseName()}.{game_tablename}")
-        return cls(wordset_id, seed, mode, pos, incorrect_chars, created_at, id)
+        return cls(wordset_id, seed, mode, pos, incorrect_chars, elapsed, created_at, id)
 
     def start_or_resume(self) -> bool:
         if self.in_progress or self.is_finished():
@@ -227,7 +234,7 @@ class TypingGame:
         self.elapsed += pause_time - self.last_paused
         self.last_paused = pause_time
         self.in_progress = False
-        return True
+        return self.save()
 
     def get_word_count(self) -> int:
         return len(self.text[:self.pos].split())
@@ -238,7 +245,7 @@ class TypingGame:
         else:
             return None
         
-    def get_accuracy(self):
+    def get_accuracy(self) -> float:
         return (self.pos - sum(self.incorrect_chars.values())) / self.pos
     
     def get_incorrect_char_freq(self):
@@ -261,5 +268,62 @@ class TypingGame:
         self.text += self.wordset.get_subset_with_repetitions(count, self.seed)
         return self.text
     
+    def get_database_id(self) -> int:
+        if not self.start_time:
+            self.logger.warning("Cannot access game entry: game not started")
+            return
+        """Return id of game entry if it exists in database."""
+        retrieveGameQueryString = f"""
+            SELECT id
+            FROM {config.GAME_TABLE} 
+            WHERE created_at = '{self.start_time}'
+            """
+        con_name = config.CON_NAME
+        game_tablename = config.GAME_TABLE
+        db = QSqlDatabase.database(con_name)
+        if not db.open():
+            self.logger.error(f"Could not open database connection {con_name}")
+            return False
+        if not database.check_table_exists(game_tablename, con_name):
+            self.logger.error(f"Game table does not exist.")
+            return False
+        query = QSqlQuery(db)
+        if not query.exec(retrieveGameQueryString) or not query.next():
+            self.logger.error(f"Unable to retrieve game data from table {game_tablename}:\n" + query.lastError().text())
+            return False
+        id = query.value(0)
+        return id
+    
     def save(self) -> bool:
-        return database.add_games_to_database([self])
+        id = self.get_database_id()
+        if id:
+            # if game exists, update
+            self.id = id
+            return self._update_database_entry()
+        else:
+            # create new entry
+            return database.add_games_to_database([self])
+        
+    def _update_database_entry(self) -> bool:
+        con_name = config.CON_NAME
+        game_tablename = config.GAME_TABLE
+        db = QSqlDatabase.database(con_name)
+        if not db.open():
+            self.logger.error(f"Could not open database connection {con_name}")
+            return False
+        if not database.check_table_exists(game_tablename, con_name):
+            self.logger.error(f"Game table does not exist.")
+            return False
+        updateGameQueryStr = f"""
+            UPDATE {game_tablename}
+            SET pos={self.pos}, incorrect_chars='{''.join(self.incorrect_chars.elements())}', elapsed={self.elapsed}
+            WHERE id={self.id};
+        """
+        query = QSqlQuery(db)
+        if not query.exec(updateGameQueryStr):
+            self.logger.error(f"Unable to update game {self.id} in table {game_tablename}:\n" + query.lastError().text())
+            return False
+
+        self.logger.debug(f"Updated game {self.id} in table {db.databaseName()}.{game_tablename}")
+        return True
+    

@@ -1,3 +1,4 @@
+
 import os
 from typing import List, Tuple, Iterable
 import logging
@@ -36,11 +37,12 @@ createGameTableQueryString = f"""
                 seed INTEGER NOT NULL,
                 pos INTEGER NOT NULL,
                 incorrect_chars TEXT,
-                created_at INTEGER NOT NULL UNIQUE,
+                elapsed REAL,
+                created_at REAL NOT NULL UNIQUE,
                 FOREIGN KEY (wordset_id)
                     REFERENCES {config.WORDSET_TABLE} (id)
                     ON DELETE SET NULL
-            )
+            );
             """
 
 insertWordsetQueryString = f"""
@@ -67,14 +69,31 @@ insertGameQueryString = f"""
             seed,
             pos,
             incorrect_chars,
+            elapsed,
             created_at
         )
-        VALUES (?, ?, ?, ?, ?, ?)
+        VALUES (?, ?, ?, ?, ?, ?, ?)
         """
 
 deleteWordsetTableQueryStr = """DROP TABLE wordsets"""
 deleteWordTableQueryStr = """DROP TABLE words"""
+deleteGameTableQueryStr = """DROP TABLE games"""
 
+
+def delete_game_table() -> bool:
+    con_name = config.CON_NAME
+    game_tablename = config.GAME_TABLE
+    db = QSqlDatabase.database(con_name)
+    if not db.open():
+        logger.error(f"Could not open database connection '{con_name}'")
+        return False
+    if True: #not check_table_exists(wordset_tablename, con_name):
+        dropTableQuery = QSqlQuery(db)
+        if not dropTableQuery.exec(deleteGameTableQueryStr):
+            logger.error(f"Unable to delete table '{game_tablename}'\n" + dropTableQuery.lastError().text())
+            return False
+        logger.debug(f"Deleted table '{game_tablename}' from {db.databaseName()}")
+    return True
 
 def delete_wordset_table() -> bool:
     con_name = config.CON_NAME
@@ -190,18 +209,19 @@ def add_games_to_database(games: Iterable['models.TypingGame']) -> bool:
     
     insertGameQuery = QSqlQuery(db)
     insertGameQuery.prepare(insertGameQueryString)
-    modes, wordset_ids, seeds, poss, incorrect_charss, created_ats = [], [], [], [], [], []
+    modes, wordset_ids, seeds, poss, incorrect_charss, elapseds, created_ats = [], [], [], [], [], [], []
     for game in games:
         # mode, wordset, seed, pos, incorrect_chars, created_at = game.mode, game.wordset, game.seed,
-        logger.debug(game)
-        if not all((game.wordset, game.seed)):
-            logger.warning(f"Ignoring game with incomplete data")
+        logger.debug(f"Preparing {game} for database insertion")
+        if not all((game.wordset, game.seed, game.elapsed)):
+            logger.warning(f"Ignoring partially initialized or corrupted game data")
             continue
         modes.append(game.mode)
         wordset_ids.append(game.wordset.id)
         seeds.append(game.seed)
         poss.append(game.pos)
         incorrect_charss.append(game.incorrect_chars)
+        elapseds.append(game.elapsed)
         created_ats.append(game.start_time)
     if created_ats:
         insertGameQuery.addBindValue(modes)
@@ -209,9 +229,11 @@ def add_games_to_database(games: Iterable['models.TypingGame']) -> bool:
         insertGameQuery.addBindValue(seeds)
         insertGameQuery.addBindValue(poss)
         insertGameQuery.addBindValue(incorrect_charss)
+        insertGameQuery.addBindValue(elapseds)
         insertGameQuery.addBindValue(created_ats)
+        # logger.debug(f"{len(modes)} {len(wordset_ids)} {len(seeds)} {len(poss)} {len(incorrect_charss)} {len(elapseds)} {len(created_ats)}")
         if not insertGameQuery.execBatch():
-            logger.error(f"Unable to insert values into table '{game_tablename}'\n" + insertGameQuery.lastError().text())
+            logger.error(f"Unable to insert values into table '{game_tablename}':\n" + insertGameQuery.lastError().text())
             return False
         logger.info(f"Added game data to database {db.databaseName()}")
     return True

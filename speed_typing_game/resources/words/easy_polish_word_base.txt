@@ -1,3 +1,4 @@
+slowa-2 pl 0
 kot
 pies
 dom

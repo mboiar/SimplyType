@@ -6,7 +6,6 @@ Functions:
     main() -> None
 
 """
-
 import logging
 import os
 import sys
@@ -50,12 +49,8 @@ def main() -> None:
             config.RESOURCES_DIR, "styles", theme, palette_name, "icon.png"
         )
     )
-    from speed_typing_game import database, models, utils
-    # database.delete_wordset_table()
-    # wordset1 = models.Wordset.from_file("speed_typing_game/resources/words/difficult_polish_word_base.txt")
-    # game = models.TypingGame(wordset1)
-
-    # database.add_games_to_database([game])
-    window = MainWindow(palette, icon)
+    # from speed_typing_game import models
+    # w = models.Wordset.from_file(r"speed_typing_game\resources\words\easy_polish_word_base.txt")
+    window = MainWindow(icon)
     window.show()
     sys.exit(app.exec())

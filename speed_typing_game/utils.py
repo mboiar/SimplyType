@@ -20,6 +20,7 @@ from typing import Dict, List, Union, Tuple
 
 from PyQt6.QtSql import QSqlDatabase
 from PyQt6.QtWidgets import QWidget, QMessageBox
+from PyQt6.QtGui import QColor, QPalette
 
 import speed_typing_game.config as config
 
@@ -41,11 +42,28 @@ def set_stylesheet(widget: QWidget, theme: str, palette_name: str = None) -> Non
             )
         logger.info(f"Set palette: {palette_name}")
         widget.setStyleSheet(style_sheet)
-    current_palette = widget.palette()
-    # TODO: modify palette
-    # current_palette.setColorGroup()
-    widget.setPalette(current_palette)
+    window_color = QColor(palette["--background-color"])
+    window_text_color = QColor(palette["--foreground-color"])
+    button_color = QColor(palette["--background-color"])
+    bright_text_color = QColor(palette["--standout-color"])
+    base_color = QColor(palette["--background-color"])
+    highlight_color = QColor(palette["--error-color"])
+    button_text_color = QColor(palette["--foreground-selected-color"])
 
+    current_palette = widget.palette()
+    current_palette.setColorGroup(
+        current_palette.currentColorGroup(),
+        window_text_color, button_color, button_color, 
+        button_color, button_color, window_text_color,
+        bright_text_color, base_color, window_color
+        )
+    current_palette.setColor(
+        current_palette.currentColorGroup(), 
+        QPalette.ColorRole.Highlight, highlight_color)
+    current_palette.setColor(
+        current_palette.currentColorGroup(), 
+        QPalette.ColorRole.ButtonText, button_text_color)
+    widget.setPalette(current_palette)
 
 def get_color_palette_names(theme: str) -> List[str]:
     """Retrieve available palette names for a dark or light theme."""
