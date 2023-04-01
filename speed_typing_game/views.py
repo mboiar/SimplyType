@@ -55,11 +55,11 @@ class MainTypingArea(QLineEdit):
         super().__init__(parent, *flags)
         self.setReadOnly(True)
         # self.textEdited.connect(self.validate_character)
-        self._pos = 0
+        # self._pos = 0
         self.label = label
-        self.typed_in = []
+        # self.typed_in = []
 
-    def textEdited(self, text: str) -> None:
+    def _textEdited(self, text: str) -> None:
         """Process user input during a game."""
         # char = self.words_input.text()[-1]
         game = self.parent().game
@@ -71,6 +71,7 @@ class MainTypingArea(QLineEdit):
             f"Typed in '{char}' - correct answer'{char_correct}'\
  - position {pos}"
         )
+        self.setText("")
         if char_correct == char:  # correct character typed
             color = self.palette().buttonText().color().name()
         else:  # incorrect character typed
@@ -81,19 +82,21 @@ class MainTypingArea(QLineEdit):
             else:
                 char = char_correct
         new_char = self.set_html_color(char, color)
-        self.typed_in.append(new_char)
-        new_text = "".join(self.typed_in) + game.text[game.pos :]
+        # self.typed_in.append(new_char)
+        self.label.formattedCharList += [new_char]
+        # new_text = "".join(self.label.formattedCharList) + game.text[game.pos :]
         if self.label.fontMetrics().boundingRect(game.text[:game.pos]).width() > self.label.geometry().width():
             self.label.newline()
-        else:
-            self.label.setText(new_text)
+        else: 
+            # self.logger.debug(f"Setting new text {self.label.formattedCharList} {list(game.text[game.pos:])}")
+            self.label.setCharList()
             if char_correct != " ":
                 ch = char_correct
             elif char == "_":
                 ch = char
             else:
                 ch = "_"
-            char_width = self.label.fontMetrics().boundingRectChar(ch).width()
+            # char_width = self.label.fontMetrics().boundingRectChar(ch).width()
             # prev_pos = self.label.label_caret.pos()
             # self.label.label_caret.move(prev_pos.x()+char_width+1, prev_pos.y())
         # super().textEdited(text)
@@ -108,7 +111,7 @@ class MainTypingArea(QLineEdit):
         key = event.key()
         modifier = event.nativeModifiers()
         window = self.parent()
-        modifier_message = "with a modifier:" + modifier if modifier else ""
+        modifier_message = ("with a modifier:" + str(modifier)) if modifier else ""
         self.logger.debug(
             f"Detected keyPressEvent: key {key} {modifier_message}"
         )
@@ -353,35 +356,67 @@ class TypingHintLabel(QLabel):
         self.label_caret.setPixmap(self._caret)
         self.label_caret.hide()
         self.max_chars_displayed = 0
+        self.min_char_pos = 0
+        self.formattedCharList = []
         self.redraw()
 
     def setText(self, text: str) -> None:
-        self.logger.debug(f"Setting label text: {text}")
-        text = text[:min(len(text), int(self.max_chars))]
+        # self.logger.debug(f"Setting label text: {text}")
+        # text = text[:min(len(text), int(self.max_chars))]
         super().setText(text) # TODO
+
+    def setCharList(self, char_list: List[str] = None) -> bool:
+        if not char_list:
+            char_list = self.formattedCharList
+        try:
+            char_list = char_list[self.min_char_pos:] # TODO: sus
+            self.check_extend()
+            remaining_text = self.parent().game.text[self.parent().game.pos:self.max_char_pos()]
+        except IndexError as e:
+            self.logger.error(f"Invalid char list (length {len(char_list)}, min pos: {self.min_char_pos}): {char_list[:10]}...")
+            return False
+        self.logger.debug(f"Char list: {char_list}")
+        self.logger.debug(f"Remaining text: {remaining_text}")
+        self.logger.debug(f"Setting rich text {''.join(char_list+list(remaining_text))}")
+        self.setText("".join(char_list+list(remaining_text)))
+        return True
+        
+    def max_char_pos(self) -> int:
+        return int(self.min_char_pos+self.max_chars)
+    
+    def check_extend(self) -> None:
+        if len(self.parent().game.text[self.min_char_pos:]) < self.max_chars:
+            self.logger.debug(f"Asking to extend text: {len(self.parent().game.text[self.min_char_pos:])} < {self.max_chars}")
+            self.parent().game.extend_text()
 
     def redraw(self) -> None:
         """Change displayed word count if width/font changed"""
         self.label_width = self.geometry().width()
         max_px_length = self.label_width * self.num_lines
-        self.max_chars = max_px_length / 1.4#self.fontMetrics().boundingRectChar("m").width()
+        self.max_chars = max_px_length / 1.4 # TODO self.fontMetrics().boundingRectChar("m").width()
+        self.char_line_width = self.label_width / 1.4
         self.logger.debug(f"Max chars: {self.max_chars}; label width: {self.label_width}; px_length: {max_px_length}; font width {self.fontMetrics().averageCharWidth()}")
-        first_char_ind = 0 # self.text_pos - self.max_chars / 2
-        last_char_ind = self.max_chars #self.text_pos + self.max_chars / 2
-        if len(self.parent().game.text[int(first_char_ind):int(last_char_ind)]) < self.max_chars_displayed:
-            super().game.extend_text()
-        self.words_displayed = self.parent().game.text[int(first_char_ind):int(last_char_ind)]
-        self.logger.debug(f"Setting label text: {self.words_displayed}")
-        self.setText(self.words_displayed)
-        self.label_caret.move(-4, 0)
+        self.setCharList()
+        # self.words_displayed = self.parent().game.text[int(first_char_ind):int(last_char_ind)]
+        # self.logger.debug(f"Setting label text: {self.words_displayed}")
+        # self.setText(self.words_displayed)
+        # self.label_caret.move(-4, 0)
         # self.chars_displayed = 0 # TODO
 
     def paintEvent(self, a0: QtGui.QPaintEvent) -> None:
         # TODO
         super().paintEvent(a0)
 
-    def newline(self):
-        self.setText(self.parent().words[self.parent()._pos:])
+    def newline(self) -> None:
+        self.logger.debug("Newline")
+        if self.line_pos == 0:
+            self.line_pos += 1
+        if self.line_pos == 1:
+            # TODO reset caret
+            self.min_char_pos += int(self.char_line_width)
+            self.logger.debug(f"Set new starting position: {self.min_char_pos}")
+        self.setCharList()
+        # self.setText(self.parent().words[self.parent()._pos:])
         # TODO
         # self.label_caret.move(-4, 0)
         # if self.cur_line == 0:
@@ -399,8 +434,6 @@ class MainWindow(QWidget):
         self.settings = QSettings("BoiarTech", config.PROJECT_NAME, self)
         self.timer = QtCore.QTimer()
         self.icon = icon
-        self.mode = "default"
-        self.duration = 30
         self.game = TypingGame()
         self.init_window()
 
@@ -430,6 +463,7 @@ class MainWindow(QWidget):
         # self.words_to_type_label.setText(self.game.text)
 
         self.words_input = MainTypingArea(self.words_to_type_label, allow_takeback=False, parent=self)
+        self.words_input.textEdited.connect(self.words_input._textEdited)
         self.button_reset = QPushButton()
 
         self.sidebarLayout = QVBoxLayout()
@@ -526,6 +560,7 @@ class MainWindow(QWidget):
         popup.SIGNALS.CLOSE.connect(self._closepopup)
         self._popflag = True
         self.game.finish_or_pause()
+        # self.timer.pause() # TODO
         popup.show()
         # self._popframe.move(0, 0)
         # self._popframe.resize(self.width(), self.height())
@@ -540,7 +575,7 @@ class MainWindow(QWidget):
 
     def reset_game(self) -> None:
         self.logger.debug("Reset game")
-        self.finish_game()
+        self.finish_game(save = False)
         self.init_game()
         self.set_focus()
 
@@ -575,7 +610,9 @@ class MainWindow(QWidget):
 
     def init_game(self, wordset_id=None, mode=None, duration=None, seed=None) -> None:
         self.game = TypingGame(wordset_id=wordset_id, mode=mode, duration=duration, seed=seed)
-        self.words_to_type_label.setText(self.game.text)
+        self.words_to_type_label.min_char_pos = self.game.pos
+        self.logger.debug(f"Setting starting label position {self.game.pos}")
+        self.words_to_type_label.setCharList()
 
     def start_game(self) -> None:
         for button in [
@@ -603,12 +640,13 @@ class MainWindow(QWidget):
     def display_results(self) -> None:
         pass
 
-    def finish_game(self) -> None:
+    def finish_game(self, save: bool = False) -> None:
         self.logger.debug("Trying to finish game?")
-        if not self.game.finish_or_pause():
+        if not self.game.finish_or_pause(save=save):
             return
+        self.words_to_type_label.formattedCharList.clear()
         self.update_timer.stop()
-        self.game.save()
+        # self.game.save()
         self.display_results()
         self.words_to_type_label.label_caret.move(0,0)
         self.init_game()

@@ -139,7 +139,7 @@ class TypingGame:
             elapsed: float = 0,
             created_at: float = None,
             id: int = None,
-            duration: int = 30
+            duration: int = 30*1000
     ) -> None:
         self.logger = logging.getLogger(__name__)
         self.seed = seed if seed else time.time()
@@ -154,7 +154,6 @@ class TypingGame:
             self.wordset = Wordset.from_database(wordset_id)
             self.logger.warning(f"Using default wordset {self.wordset}")
         self.text = " ".join(self.wordset.get_subset_with_repetitions(100, self.seed))
-        print(self.text)
         self.pos = pos
         self.mode = mode if mode else 'default'
         self.duration = duration if duration else 30*1000
@@ -167,10 +166,10 @@ class TypingGame:
         self.logger.info(f"Initializing {self}")
 
     def __str__(self) -> str:
-        return f"Game: wordset {self.wordset}, seed {self.seed}, mode {self.mode}, elapsed: {self.elapsed} out of {self.duration}"
+        return f"TypingGame: wordset {self.wordset}, seed {self.seed}, mode {self.mode}, elapsed: {self.elapsed} out of {self.duration} ms"
     
     def __repr__(self) -> str:
-        return f"Game: wordset {self.wordset}, seed {self.seed}, mode {self.mode}, elapsed: {self.elapsed} out of {self.duration}"
+        return f"TypingGame: wordset {self.wordset}, seed {self.seed}, mode {self.mode}, elapsed: {self.elapsed} out of {self.duration} ms"
 
     @classmethod
     def from_database(cls, id: int = None, created_at: int = None) -> 'TypingGame':
@@ -222,11 +221,12 @@ class TypingGame:
             return False
         if not self.start_time:
             self.start_time = time.time()
+            self.last_paused = self.start_time
         self.in_progress = True
         self.logger.info(f"Started/resumed game {self}")
         return True
 
-    def finish_or_pause(self) -> bool:
+    def finish_or_pause(self, save: bool = True) -> bool:
         if not self.in_progress or self.is_finished():
             self.logger.warning("Unable to pause: game not in progress or finished")
             return False
@@ -234,7 +234,10 @@ class TypingGame:
         self.elapsed += pause_time - self.last_paused
         self.last_paused = pause_time
         self.in_progress = False
-        return self.save()
+        if save:
+            return self.save()
+        else:
+            return True
 
     def get_word_count(self) -> int:
         return len(self.text[:self.pos].split())
@@ -265,7 +268,8 @@ class TypingGame:
         }
     
     def extend_text(self, count: int = 100) -> str:
-        self.text += self.wordset.get_subset_with_repetitions(count, self.seed)
+        self.logger.info(f"Game: extending text by {count} words")
+        self.text += " ".join(self.wordset.get_subset_with_repetitions(count, self.seed))
         return self.text
     
     def get_database_id(self) -> int:
