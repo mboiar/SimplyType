@@ -42,7 +42,6 @@ def main() -> None:
     # theme =  detect_dark_theme_os()
     theme = "dark"
     palette_name = get_color_palette_names(theme)[0]
-    palette = get_color_palette(theme, palette_name)
     set_stylesheet(app, theme, palette_name)
     icon = QIcon(
         os.path.join(

@@ -1,6 +1,6 @@
 import sys
 
-from speed_typing_game import database, models, utils, config
+from speed_typing_game import config, database, models, utils
 
 if __name__ == "__main__":
     if not utils.create_connection(config.DB, config.CON_NAME):

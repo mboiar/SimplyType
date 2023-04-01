@@ -16,20 +16,24 @@ import json
 import logging
 import os
 from datetime import datetime as dt
-from typing import Dict, List, Union, Tuple
+from typing import Dict, List, Tuple, Union, Optional
 
-from PyQt6.QtSql import QSqlDatabase
-from PyQt6.QtWidgets import QWidget, QMessageBox
 from PyQt6.QtGui import QColor, QPalette
+from PyQt6.QtSql import QSqlDatabase
+from PyQt6.QtCore import QObject
 
 import speed_typing_game.config as config
 
 logger = logging.getLogger(__name__)
 
 
-def set_stylesheet(widget: QWidget, theme: str, palette_name: str = None) -> None:
+def set_stylesheet(
+    object: QObject, theme: str, palette_name: Optional[str] = None
+) -> None:
     """Set stylesheet with a given palette on the widget."""
-    logger.debug(f"Attempting to set color palette of {widget} to {palette_name} ({theme})")
+    logger.debug(
+        f"Attempting to set color palette of {object} to {palette_name} ({theme})"
+    )
     palette_name, palette = get_color_palette(theme, palette_name)
     template_path = os.path.join(
         config.RESOURCES_DIR, "styles", "template.css"
@@ -41,7 +45,7 @@ def set_stylesheet(widget: QWidget, theme: str, palette_name: str = None) -> Non
                 f"var({color_var})", '"' + palette[color_var] + '"'
             )
         logger.info(f"Set palette: {palette_name}")
-        widget.setStyleSheet(style_sheet)
+        object.setStyleSheet(style_sheet)
     window_color = QColor(palette["--background-color"])
     window_text_color = QColor(palette["--foreground-color"])
     button_color = QColor(palette["--background-color"])
@@ -50,20 +54,31 @@ def set_stylesheet(widget: QWidget, theme: str, palette_name: str = None) -> Non
     highlight_color = QColor(palette["--error-color"])
     button_text_color = QColor(palette["--foreground-selected-color"])
 
-    current_palette = widget.palette()
+    current_palette = object.palette()
     current_palette.setColorGroup(
         current_palette.currentColorGroup(),
-        window_text_color, button_color, button_color, 
-        button_color, button_color, window_text_color,
-        bright_text_color, base_color, window_color
-        )
+        window_text_color,
+        button_color,
+        button_color,
+        button_color,
+        button_color,
+        window_text_color,
+        bright_text_color,
+        base_color,
+        window_color,
+    )
     current_palette.setColor(
-        current_palette.currentColorGroup(), 
-        QPalette.ColorRole.Highlight, highlight_color)
+        current_palette.currentColorGroup(),
+        QPalette.ColorRole.Highlight,
+        highlight_color,
+    )
     current_palette.setColor(
-        current_palette.currentColorGroup(), 
-        QPalette.ColorRole.ButtonText, button_text_color)
-    widget.setPalette(current_palette)
+        current_palette.currentColorGroup(),
+        QPalette.ColorRole.ButtonText,
+        button_text_color,
+    )
+    object.setPalette(current_palette)
+
 
 def get_color_palette_names(theme: str) -> List[str]:
     """Retrieve available palette names for a dark or light theme."""
@@ -75,12 +90,12 @@ def get_color_palette_names(theme: str) -> List[str]:
     return palette_names
 
 
-def get_color_palette(theme: str, palette_name: str) -> Tuple[str, Dict]:
+def get_color_palette(theme: str, palette_name: Optional[str] = "") -> Tuple[str, Dict]:
     """Retrieve a dict with colors for a given palette name."""
     if not palette_name or not os.path.exists(
         os.path.join(
-        config.RESOURCES_DIR, "styles", theme, palette_name, "colors.json"
-    )
+            config.RESOURCES_DIR, "styles", theme, palette_name, "colors.json"
+        )
     ):
         default_palette_name = get_color_palette_names(theme)[0]
         palette_name = default_palette_name
@@ -99,7 +114,7 @@ def setup_logging(log_destination: str, log_level: Union[int, str]) -> None:
     """Setup console and/or file loggers to be used throughout application."""
     timestamp = dt.now().strftime("%Y-%m-%d_%H-%M-%S")
     log_filename = os.path.join(config.LOG_DIR, f"{timestamp}.log")
-    handlers = []
+    handlers: List[logging.Handler] = []
     if log_destination in ["console", "both"]:
         handlers.append(logging.StreamHandler())
     if log_destination in ["file", "both"]:
@@ -120,12 +135,7 @@ def create_connection(db_name: str, con_name: str) -> bool:
     con.setDatabaseName(db_name)
 
     if not con.open():
-        QMessageBox.critical(
-            None,
-            f"{config.PROJECT_NAME} - Error!",
-            "Database Error: %s" % con.lastError().databaseText(),
-        )
-        logger.critical("Unable to connect to the database")
+        logger.error(f"Database Error: {con.lastError().databaseText()}")
         return False
     return True
 

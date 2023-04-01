@@ -2,44 +2,38 @@
 Classes:
 
     MainTypingArea(QLineEdit)
+    TranslucentWidget(QWidget)
+    TypingHintLabel(QLabel)
     MainWindow(QWidget)
 
 """
 import logging
 import sys
-import time
-from typing import List, Dict, TypeVar
+from typing import Dict, List
 
 import PyQt6.QtCore as QtCore
-from PyQt6.QtCore import QCoreApplication, Qt, QUrl, QSettings, QRect
 import PyQt6.QtGui as QtGui
-from PyQt6.QtGui import (QCursor, QDesktopServices, QIcon, QKeyEvent,
-                         QMouseEvent, QFontMetrics, QPixmap, QResizeEvent)
-from PyQt6.QtWidgets import (QHBoxLayout, QLabel, QLineEdit, QPushButton,
-                             QVBoxLayout, QWidget, QButtonGroup, QFileDialog, QListView, QGridLayout, QGroupBox)
-# from PyQt6.QtQuick
+from PyQt6.QtCore import QCoreApplication, QSettings, Qt, QUrl
+from PyQt6.QtGui import (QCursor, QDesktopServices, QFontMetrics, QIcon,
+                         QKeyEvent, QMouseEvent, QPixmap, QResizeEvent)
+from PyQt6.QtWidgets import (QButtonGroup, QFileDialog, QGridLayout, QGroupBox,
+                             QHBoxLayout, QLabel, QLineEdit, QListView,
+                             QPushButton, QVBoxLayout, QWidget)
 
 from speed_typing_game import config
-from speed_typing_game.utils import set_stylesheet
 from speed_typing_game.models import TypingGame
-
-# translate = QtCore.QCoreApplication.translate
-update_timer_interval = 200
-game_duration = 20 * 1000
-BACKSPACE_KEY = 16777219
-DELETE_KEY = 16777223
-X_KEY = 88
-V_KEY = 86
-TAKEBACK_KEYS = [BACKSPACE_KEY, DELETE_KEY]
-CUT_KEYS = [X_KEY, V_KEY]
-CTRL_MODIFIER = 2
+from speed_typing_game.utils import set_stylesheet
 
 
 class MainTypingArea(QLineEdit):
     """A class representing a typing area in the game."""
 
     def __init__(
-        self, label: QWidget, allow_takeback: bool = False, parent: 'MainWindow' = None, *flags
+        self,
+        label: QWidget,
+        allow_takeback: bool = False,
+        parent: "MainWindow" = None,
+        *flags,
     ) -> None:
         """
         Parameters
@@ -85,17 +79,22 @@ class MainTypingArea(QLineEdit):
         # self.typed_in.append(new_char)
         self.label.formattedCharList += [new_char]
         # new_text = "".join(self.label.formattedCharList) + game.text[game.pos :]
-        if self.label.fontMetrics().boundingRect(game.text[:game.pos]).width() > self.label.geometry().width():
+        if (
+            self.label.fontMetrics()
+            .boundingRect(game.text[: game.pos])
+            .width()
+            > self.label.geometry().width()
+        ):
             self.label.newline()
-        else: 
+        else:
             # self.logger.debug(f"Setting new text {self.label.formattedCharList} {list(game.text[game.pos:])}")
             self.label.setCharList()
-            if char_correct != " ":
-                ch = char_correct
-            elif char == "_":
-                ch = char
-            else:
-                ch = "_"
+            # if char_correct != " ":
+            #     ch = char_correct
+            # elif char == "_":
+            #     ch = char
+            # else:
+            #     ch = "_"
             # char_width = self.label.fontMetrics().boundingRectChar(ch).width()
             # prev_pos = self.label.label_caret.pos()
             # self.label.label_caret.move(prev_pos.x()+char_width+1, prev_pos.y())
@@ -105,25 +104,26 @@ class MainTypingArea(QLineEdit):
     def set_html_color(text: str, color: str) -> str:
         return f'<span style="color: {color};">{text}</span>'
 
-
     def keyPressEvent(self, event: QKeyEvent) -> None:
         """Process and filter user input, then call default (overrided) method."""
         key = event.key()
         modifier = event.nativeModifiers()
         window = self.parent()
-        modifier_message = ("with a modifier:" + str(modifier)) if modifier else ""
+        modifier_message = (
+            ("with a modifier:" + str(modifier)) if modifier else ""
+        )
         self.logger.debug(
             f"Detected keyPressEvent: key {key} {modifier_message}"
         )
-        is_cutpaste_event = modifier == CTRL_MODIFIER and key in CUT_KEYS
+        is_cutpaste_event = modifier == config.CTRL_MODIFIER and key in config.CUT_KEYS
         if (not self.allow_takeback) and (
-            key in TAKEBACK_KEYS or is_cutpaste_event
+            key in config.TAKEBACK_KEYS or is_cutpaste_event
         ):
             self.logger.debug(
                 "Skipped takeback event: takeback is not allowed"
             )
             return
-        elif key in TAKEBACK_KEYS or is_cutpaste_event:
+        elif key in config.TAKEBACK_KEYS or is_cutpaste_event:
             self.logger.debug("Takeback")
         if not window.game.in_progress:
             window.start_game()
@@ -157,6 +157,7 @@ class TranslucentWidgetSignals(QtCore.QObject):
     # SIGNALS
     CLOSE = QtCore.pyqtSignal()
 
+
 class TranslucentWidget(QWidget):
     def __init__(self, parent: QWidget = None) -> None:
         super().__init__(parent)
@@ -165,14 +166,13 @@ class TranslucentWidget(QWidget):
         self.setWindowFlags(QtCore.Qt.WindowFlags.FramelessWindowHint)
         self.setAttribute(QtCore.Qt.WidgetAttribute.WA_TranslucentBackground)
 
-        self.fillColor = QtGui.QColor(30, 30, 30, 120)         # TODO
-        self.penColor = QtGui.QColor("#333333")                # TODO
+        self.fillColor = QtGui.QColor(30, 30, 30, 120)  # TODO
+        self.penColor = QtGui.QColor("#333333")  # TODO
 
         # self.popup_fillColor = QtGui.QColor(240, 240, 240, 255)
         # self.popup_penColor = QtGui.QColor(200, 200, 200, 255)
-        self.popup_fillColor = QtGui.QColor(240, 240, 240, 255) # TODO
+        self.popup_fillColor = QtGui.QColor(240, 240, 240, 255)  # TODO
         self.popup_penColor = QtGui.QColor(200, 200, 200, 255)  # TODO
-
 
         self.close_btn = QPushButton(self)
         self.close_btn.setText("x")
@@ -215,8 +215,8 @@ class TranslucentWidget(QWidget):
         qp.setBrush(self.popup_fillColor)
         popup_width = 300
         popup_height = 120
-        ow = int(s.width()/2-popup_width/2)
-        oh = int(s.height()/2-popup_height/2)
+        ow = int(s.width() / 2 - popup_width / 2)
+        oh = int(s.height() / 2 - popup_height / 2)
         qp.drawRoundedRect(ow, oh, popup_width, popup_height, 5, 5)
 
         font = QtGui.QFont()
@@ -225,7 +225,11 @@ class TranslucentWidget(QWidget):
         qp.setFont(font)
         qp.setPen(QtGui.QColor(70, 70, 70))
         tolw, tolh = 80, -5
-        qp.drawText(ow + int(popup_width/2) - tolw, oh + int(popup_height/2) - tolh, "Will this work?")
+        qp.drawText(
+            ow + int(popup_width / 2) - tolw,
+            oh + int(popup_height / 2) - tolh,
+            "Will this work?",
+        )
 
         qp.end()
 
@@ -233,8 +237,9 @@ class TranslucentWidget(QWidget):
         self.logger.debug(f"Closed pop-up {__name__}")
         self.SIGNALS.CLOSE.emit()
 
+
 class SettingsMenu(TranslucentWidget):
-    def __init__(self, parent: 'MainWindow') -> None:
+    def __init__(self, parent: "MainWindow") -> None:
         super().__init__(parent)
         # self.theme_id = False
         self.initUI()
@@ -242,12 +247,15 @@ class SettingsMenu(TranslucentWidget):
     def initUI(self) -> None:
         self.resize(150, 200)
         self.setLayout(QGridLayout())
-        self.theme_switch = QPushButton("""<label class="switch">
+        self.theme_switch = QPushButton(
+            """<label class="switch">
             <input type="checkbox">
             <span class="slider round"></span>
-        </label>""")
+        </label>"""
+        )
         self.theme_switch.clicked.connect(self.toggle_theme)
-        self.theme_switch.setStyleSheet("""
+        self.theme_switch.setStyleSheet(
+            """
 
  /* The switch - the box around the slider */
  .switch {
@@ -311,19 +319,18 @@ class SettingsMenu(TranslucentWidget):
   .slider.round:before {
     border-radius: 50%;
   } 
-        """)
+        """
+        )
         self.theme_switch_label = QLabel()
         self.layout().addWidget(self.theme_switch, 0, 0)
         self.layout().addWidget(self.theme_switch_label, 0, 1)
         self.retranslateUI()
 
-
     def toggle_theme(self) -> None:
-        themes = ['light', 'dark']
+        themes = ["light", "dark"]
         # self.theme_id = not self.theme_id
         set_stylesheet(
-            QCoreApplication.instance(),
-            themes[self.theme_switch.isChecked()]
+            QCoreApplication.instance(), themes[self.theme_switch.isChecked()]
         )
 
     def retranslateUI(self) -> None:
@@ -331,71 +338,89 @@ class SettingsMenu(TranslucentWidget):
             QCoreApplication.translate("QLabel", "Select theme")
         )
 
+
 class LanguageMenu(TranslucentWidget):
     pass
+
 
 class AboutPage(TranslucentWidget):
     pass
 
+
 class DurationMenu(TranslucentWidget):
     pass
+
 
 class ModeMenu(TranslucentWidget):
     pass
 
+
 class TypingHintLabel(QLabel):
-    def __init__(self, parent: 'MainWindow' = None, *flags):
+    """Label displaying user typed input."""
+
+    def __init__(self, parent: "MainWindow" = None, *flags):
         super().__init__(parent, *flags)
         self.logger = logging.getLogger(__name__)
-        self.max_chars = 0
-        self.num_lines = 3
-        self.line_pos = 0
-        self.cur_line = 0
-        self._caret = QPixmap(config.RESOURCES_DIR+'/images/cursor.png')
+        self.max_chars: float = 0
+        self.num_lines: int = 3
+        self.line_pos: int = 0
+        self._caret = QPixmap(config.RESOURCES_DIR + "/images/cursor.png")
         self.label_caret = QLabel(self)
         self.label_caret.setPixmap(self._caret)
         self.label_caret.hide()
-        self.max_chars_displayed = 0
-        self.min_char_pos = 0
-        self.formattedCharList = []
+        self.max_chars_displayed: float = 0
+        self.min_char_pos: int = 0
+        self.formattedCharList: List = []
         self.redraw()
 
     def setText(self, text: str) -> None:
         # self.logger.debug(f"Setting label text: {text}")
         # text = text[:min(len(text), int(self.max_chars))]
-        super().setText(text) # TODO
+        super().setText(text)  # TODO
 
     def setCharList(self, char_list: List[str] = None) -> bool:
         if not char_list:
             char_list = self.formattedCharList
         try:
-            char_list = char_list[self.min_char_pos:] # TODO: sus
+            char_list = char_list[self.min_char_pos :]  # TODO: sus
             self.check_extend()
-            remaining_text = self.parent().game.text[self.parent().game.pos:self.max_char_pos()]
+            remaining_text = self.parent().game.text[
+                self.parent().game.pos : self.max_char_pos()
+            ]
         except IndexError as e:
-            self.logger.error(f"Invalid char list (length {len(char_list)}, min pos: {self.min_char_pos}): {char_list[:10]}...")
+            self.logger.error(
+                f"Invalid char list (length {len(char_list)}, min pos: {self.min_char_pos}): {char_list[:10]}..."
+            )
             return False
         self.logger.debug(f"Char list: {char_list}")
         self.logger.debug(f"Remaining text: {remaining_text}")
-        self.logger.debug(f"Setting rich text {''.join(char_list+list(remaining_text))}")
-        self.setText("".join(char_list+list(remaining_text)))
+        self.logger.debug(
+            f"Setting rich text {''.join(char_list+list(remaining_text))}"
+        )
+        self.setText("".join(char_list + list(remaining_text)))
         return True
-        
+
     def max_char_pos(self) -> int:
-        return int(self.min_char_pos+self.max_chars)
-    
+        return int(self.min_char_pos + self.max_chars)
+
     def check_extend(self) -> None:
-        if len(self.parent().game.text[self.min_char_pos:]) < self.max_chars:
-            self.logger.debug(f"Asking to extend text: {len(self.parent().game.text[self.min_char_pos:])} < {self.max_chars}")
+        if len(self.parent().game.text[self.min_char_pos :]) < self.max_chars:
+            self.logger.debug(
+                f"Asking to extend text: {len(self.parent().game.text[self.min_char_pos:])} < {self.max_chars}"
+            )
             self.parent().game.extend_text()
 
     def redraw(self) -> None:
         """Change displayed word count if width/font changed"""
         self.label_width = self.geometry().width()
         max_px_length = self.label_width * self.num_lines
-        self.max_chars = max_px_length / 1.4 # TODO self.fontMetrics().boundingRectChar("m").width()
+        self.max_chars = (
+            max_px_length / 1.4
+        )  # TODO self.fontMetrics().boundingRectChar("m").width()
         self.char_line_width = self.label_width / 1.4
-        self.logger.debug(f"Max chars: {self.max_chars}; label width: {self.label_width}; px_length: {max_px_length}; font width {self.fontMetrics().averageCharWidth()}")
+        self.logger.debug(
+            f"Max chars: {self.max_chars}; label width: {self.label_width}; px_length: {max_px_length}; font width {self.fontMetrics().averageCharWidth()}"
+        )
         self.setCharList()
         # self.words_displayed = self.parent().game.text[int(first_char_ind):int(last_char_ind)]
         # self.logger.debug(f"Setting label text: {self.words_displayed}")
@@ -414,7 +439,9 @@ class TypingHintLabel(QLabel):
         if self.line_pos == 1:
             # TODO reset caret
             self.min_char_pos += int(self.char_line_width)
-            self.logger.debug(f"Set new starting position: {self.min_char_pos}")
+            self.logger.debug(
+                f"Set new starting position: {self.min_char_pos}"
+            )
         self.setCharList()
         # self.setText(self.parent().words[self.parent()._pos:])
         # TODO
@@ -462,7 +489,9 @@ class MainWindow(QWidget):
         self.words_to_type_label.setProperty("class", "words_to_type")
         # self.words_to_type_label.setText(self.game.text)
 
-        self.words_input = MainTypingArea(self.words_to_type_label, allow_takeback=False, parent=self)
+        self.words_input = MainTypingArea(
+            self.words_to_type_label, allow_takeback=False, parent=self
+        )
         self.words_input.textEdited.connect(self.words_input._textEdited)
         self.button_reset = QPushButton()
 
@@ -575,7 +604,7 @@ class MainWindow(QWidget):
 
     def reset_game(self) -> None:
         self.logger.debug("Reset game")
-        self.finish_game(save = False)
+        self.finish_game(save=False)
         self.init_game()
         self.set_focus()
 
@@ -608,8 +637,12 @@ class MainWindow(QWidget):
             QCoreApplication.translate("Qlabel", "Begin typing to start")
         )
 
-    def init_game(self, wordset_id=None, mode=None, duration=None, seed=None) -> None:
-        self.game = TypingGame(wordset_id=wordset_id, mode=mode, duration=duration, seed=seed)
+    def init_game(
+        self, wordset_id=None, mode=None, duration=None, seed=None
+    ) -> None:
+        self.game = TypingGame(
+            wordset_id=wordset_id, mode=mode, duration=duration, seed=seed
+        )
         self.words_to_type_label.min_char_pos = self.game.pos
         self.logger.debug(f"Setting starting label position {self.game.pos}")
         self.words_to_type_label.setCharList()
@@ -648,7 +681,7 @@ class MainWindow(QWidget):
         self.update_timer.stop()
         # self.game.save()
         self.display_results()
-        self.words_to_type_label.label_caret.move(0,0)
+        self.words_to_type_label.label_caret.move(0, 0)
         self.init_game()
 
         for button in [
