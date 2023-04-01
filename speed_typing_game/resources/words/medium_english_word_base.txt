@@ -1,3 +1,4 @@
+medium-english en 1
 pumpkin
 bicycle
 universe

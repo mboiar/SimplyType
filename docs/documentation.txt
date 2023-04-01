@@ -9,7 +9,13 @@ Stworzono interfejs GUI dla okna głównego aplikacji oraz zaimplementowano wali
 
 18.03.2023 - Filip Chałupka - Implementacja podliczania statystyk gry
 
-19.03.2023 - Maksym Boiar - rejestracja zdarzeń + proces gry
+19.03.2023 - Maksym Boiar - Rejestracja zdarzeń + proces gry
 Dodano rejestrację przebiegu działania programu (logging) i zaimplementowano rozpoczęcie/zakończenie gry
 
-23.03.2023 - Filip Chałupka - Dodano koncepcje ekranu ustawień gry i przykładowe przejscia pomiędzy interfejsami.
+23.03.2023 - Filip Chałupka - Dodanie koncepcji ekranu ustawień gry i przykładowe przejścia pomiędzy interfejsami.
+
+24.03.2023 - Maksym Boiar - Refaktoryzacja kodu
+
+28.03.2023 - Mateusz Basiura - Dodanie zbiorów słów i wyrazów
+
+28.04.2023 - Maksym Boiar - Interakcja z bazą danych i okna wyskakujące

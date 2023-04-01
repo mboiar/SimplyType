@@ -1,0 +1,48 @@
+Table db.word_sets as WS {
+  id int [pk]
+  name varchar
+  language_code int [ref: > L.code]
+  difficulty int
+
+}
+
+Table db.languages as L {
+  code int [pk, increment]
+  name varchar
+}
+
+Table db.modes as M {
+  id int [pk]
+  name varchar
+}
+
+Table db.games {
+  id int [pk]
+  mode_id int [ref: > M.id]
+  word_set_id int [ref: > WS.id]
+  seed int
+  created_at timestamp
+ }
+
+Table db.game_states {
+  id int [pk]
+  game_id int [ref: > db.games.id]
+  label string
+  position int
+  time_elapsed int
+}
+
+Table db.game_statistics {
+  id int [pk]
+  game_id int [ref: - db.games.id]
+  incorrect_chars varchar
+  incorrect_chars_frequency varchar
+  word_count int
+}
+
+Table db.words {
+  id int [pk]
+  content varchar [not null, unique]
+  word_set_id int [ref: > db.word_sets.id]
+  type bool
+}

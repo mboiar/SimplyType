@@ -131,3 +131,6 @@ dmypy.json
 # other
 main.css
 *.jsonc
+
+# VS Code
+.vscode

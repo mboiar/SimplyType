@@ -1,3 +1,4 @@
+english-easy en 0
 cat
 dog
 house
