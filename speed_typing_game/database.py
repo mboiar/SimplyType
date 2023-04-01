@@ -2,6 +2,7 @@
 import os
 from typing import List, Tuple, Iterable
 import logging
+from functools import lru_cache
 
 from PyQt6.QtSql import QSqlDatabase, QSqlQuery, QSqlQueryModel
 
@@ -116,9 +117,6 @@ def delete_wordset_table() -> bool:
 
 def check_table_exists(tablename: str, db_con: str) -> bool:
     return tablename in QSqlDatabase.database(db_con).tables()
-
-path = "speed_typing_game/resources/words/difficult_english_word_base.txt"
-
 
 def add_wordsets_to_database(wordsets: Iterable['models.Wordset']) -> bool:
     con_name = config.CON_NAME

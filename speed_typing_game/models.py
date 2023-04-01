@@ -12,6 +12,7 @@ import time
 from collections import Counter
 import random
 import sys
+from functools import lru_cache
 
 from PyQt6.QtSql import QSqlDatabase, QSqlQuery
 
@@ -66,8 +67,9 @@ class Wordset:
                 logger.warning(f"Received empty wordset {file_path}")
                 return
             return cls(name, language, difficulty, words)
-        
+
     @classmethod
+    @lru_cache(maxsize=4)
     def from_database(cls, id: int = None, name: str = "") -> 'Wordset':
         logger = logging.getLogger(__name__)
         if id:
@@ -153,6 +155,7 @@ class TypingGame:
             wordset_id = ids[1]
             self.wordset = Wordset.from_database(wordset_id)
             self.logger.warning(f"Using default wordset {self.wordset}")
+            self.logger.debug(Wordset.from_database.cache_info())
         self.text = " ".join(self.wordset.get_subset_with_repetitions(100, self.seed))
         self.pos = pos
         self.mode = mode if mode else 'default'
