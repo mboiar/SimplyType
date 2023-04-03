@@ -6,6 +6,8 @@ A cross-platform typing game with a clean GUI interface.
 
 ## Features
 
+- efficient SQLite-based storage with fast access
+- appealing interface
 - different game modes
 - game statistics
 - theme and language customization
@@ -26,7 +28,11 @@ A cross-platform typing game with a clean GUI interface.
     python3 .\speed_typing_game.py
     ```
 
-## Adding translations
+## Contributing color schemes
+
+Place a JSON file with color names and values (see examples in the repository) in a subdirectory `resources/styles/[theme]/[color-scheme-name]`, where `theme` is either `dark` or `light` depending on your colors and `color-scheme-name` is the name of your color scheme. Then create a pull request.
+
+## Contributing translations
 
 To translate the application into a new language using PyQt tools, do the following:
 

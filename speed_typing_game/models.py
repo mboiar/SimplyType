@@ -47,7 +47,7 @@ class Wordset:
     def get_subset_with_repetitions(
         self, count: int, seed: Optional[float] = None
     ) -> Tuple[str]:
-        """Ranomly generate a tuple of words from this wordset, with possible repetitions."""
+        """Randomly generate a tuple of words from this wordset, with possible repetitions."""
         if not self.words:
             self.logger.warning("Unable to permute empty wordset.")
             return ()
@@ -164,6 +164,7 @@ class TypingGame:
         elapsed: float = 0,
         created_at: float = 0,
         id: Optional[int] = None,
+        last_updated: float = 0,
         duration: int = 30 * 1000,
     ) -> None:
         self.logger = logging.getLogger(__name__)
@@ -194,7 +195,7 @@ class TypingGame:
         self.in_progress: bool = False
         self.start_time = created_at
         self.elapsed = elapsed
-        self.last_paused: float = 0
+        self.last_paused: float = last_updated
         self.id = id
         self.logger.info(f"Initializing {self}")
 
@@ -212,13 +213,13 @@ class TypingGame:
         logger = logging.getLogger(__name__)
         if id:
             retrieveGameQueryString = f"""
-            SELECT id, mode, wordset_id, seed, pos, incorrect_chars, elapsed, created_at
+            SELECT id, mode, wordset_id, seed, pos, incorrect_chars, elapsed, created_at, word_count, last_updated
             FROM {config.GAME_TABLE} 
             WHERE ID = '{id}'
             """
         elif created_at:
             retrieveGameQueryString = f"""
-            SELECT id, mode, wordset_id, seed, pos, incorrect_chars, elapsed, created_at
+            SELECT id, mode, wordset_id, seed, pos, incorrect_chars, elapsed, created_at, word_count, last_updated
             FROM {config.GAME_TABLE}
             WHERE created_at = '{created_at}'
             """
@@ -252,6 +253,8 @@ class TypingGame:
         incorrect_chars = query.value(5)
         elapsed = float(query.value(6))
         created_at = float(query.value(7))
+        word_count = int(query.value(8))
+        last_updated = float(query.value(9))
 
         logger.debug(
             f"Retrieved game created at {created_at} from table {db.databaseName()}.{game_tablename}"
@@ -265,6 +268,7 @@ class TypingGame:
             elapsed,
             created_at,
             id,
+            last_updated
         )
 
     def start_or_resume(self) -> bool:

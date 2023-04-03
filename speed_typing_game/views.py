@@ -9,7 +9,8 @@ Classes:
 """
 import logging
 import sys
-from typing import Dict, List
+from typing import Dict, List, Tuple, Optional
+from collections import Counter
 
 import PyQt6.QtCore as QtCore
 import PyQt6.QtGui as QtGui
@@ -18,9 +19,10 @@ from PyQt6.QtGui import (QCursor, QDesktopServices, QFontMetrics, QIcon,
                          QKeyEvent, QMouseEvent, QPixmap, QResizeEvent)
 from PyQt6.QtWidgets import (QButtonGroup, QFileDialog, QGridLayout, QGroupBox,
                              QHBoxLayout, QLabel, QLineEdit, QListView,
-                             QPushButton, QVBoxLayout, QWidget)
+                             QPushButton, QVBoxLayout, QWidget, QAbstractButton)
+import pyqtgraph as pg
 
-from speed_typing_game import config
+from speed_typing_game import config, models, database
 from speed_typing_game.models import TypingGame
 from speed_typing_game.utils import set_stylesheet
 
@@ -72,7 +74,7 @@ class MainTypingArea(QLineEdit):
             color = self.palette().highlight().color().name()
             self.parent().game.incorrect_chars.update(char_correct)
             if char_correct == " ":
-                char = "_"
+                char = " "
             else:
                 char = char_correct
         new_char = self.set_html_color(char, color)
@@ -80,10 +82,7 @@ class MainTypingArea(QLineEdit):
         self.label.formattedCharList += [new_char]
         # new_text = "".join(self.label.formattedCharList) + game.text[game.pos :]
         if (
-            self.label.fontMetrics()
-            .boundingRect(game.text[: game.pos])
-            .width()
-            > self.label.geometry().width()
+            self.parent().game.pos % int(self.label.char_line_width) == 0
         ):
             self.label.newline()
         else:
@@ -132,27 +131,6 @@ class MainTypingArea(QLineEdit):
         self.setReadOnly(True)
 
 
-# class WordsetMenu(QWidget):
-#     def __init__(self, parent=None) -> None:
-#         super.__init__(parent)
-#         self.resize(415, 200)
-#         self.model = WordSet(self)
-#         self.model.setData("wordsets")
-#         self.view = QListView()
-#         self.view.setModel(self.model)
-#         self.initUI()
-
-#     def initUI(self) -> None:
-#         self.layout = QGridLayout()
-#         self.view.setLayout(self.layout)
-#         self.view.setFlow(QListView.Flow.LeftToRight)
-#         self.view.setWrapping(True)
-#         self.view.setSpacing(3)
-
-#         self.file_select = QFileDialog(self)
-#         self.wordset_options = QButtonGroup()
-
-
 class TranslucentWidgetSignals(QtCore.QObject):
     # SIGNALS
     CLOSE = QtCore.pyqtSignal()
@@ -162,45 +140,45 @@ class TranslucentWidget(QWidget):
     def __init__(self, parent: QWidget = None) -> None:
         super().__init__(parent)
 
+        self.logger = logging.getLogger(__name__)
         # make the window frameless
         self.setWindowFlags(QtCore.Qt.WindowFlags.FramelessWindowHint)
         self.setAttribute(QtCore.Qt.WidgetAttribute.WA_TranslucentBackground)
 
-        self.fillColor = QtGui.QColor(30, 30, 30, 120)  # TODO
-        self.penColor = QtGui.QColor("#333333")  # TODO
+        self.fillColor = self.palette().window().color().darker(120) #QtGui.QColor(30, 30, 30, 120)  # TODO
+        self.penColor = self.palette().windowText().color().darker(120) #QtGui.QColor("#333333")  # TODO
 
         # self.popup_fillColor = QtGui.QColor(240, 240, 240, 255)
         # self.popup_penColor = QtGui.QColor(200, 200, 200, 255)
-        self.popup_fillColor = QtGui.QColor(240, 240, 240, 255)  # TODO
-        self.popup_penColor = QtGui.QColor(200, 200, 200, 255)  # TODO
+        self.popup_fillColor = self.palette().window().color() #QtGui.QColor(240, 240, 240, 255)  # TODO
+        self.popup_penColor = self.palette().windowText().color() #QtGui.QColor(200, 200, 200, 255)  # TODO
 
         self.close_btn = QPushButton(self)
         self.close_btn.setText("x")
         self.close_btn.setCursor(QCursor(Qt.CursorShape.PointingHandCursor))
 
+        self.popup_width = self.width()//2
+        self.popup_height = self.height()//2
+
         font = QtGui.QFont()
-        font.setPixelSize(12)
+        font.setPixelSize(14)
         font.setBold(True)
         self.close_btn.setFont(font)
-        self.close_btn.setStyleSheet("background-color: rgb(0, 0, 0, 0)")
+        # self.close_btn.setStyleSheet("background-color: rgb(0, 0, 0, 0)")
         self.close_btn.setFixedSize(30, 30)
         self.close_btn.clicked.connect(self._onclose)
-        self.logger = logging.getLogger(__name__)
 
         self.SIGNALS = TranslucentWidgetSignals()
 
     def resizeEvent(self, event):
         s = self.size()
-        popup_width = 300
-        popup_height = 120
-        ow = int(s.width() / 2 - popup_width / 2)
-        oh = int(s.height() / 2 - popup_height / 2)
+        # popup_width = 300
+        # popup_height = 120
+        ow = int(s.width() / 2 - self.popup_width / 2)
+        oh = int(s.height() / 2 - self.popup_height / 2)
         self.close_btn.move(ow + 265, oh + 5)
 
     def paintEvent(self, event):
-        # This method is, in practice, drawing the contents of
-        # your window.
-
         # get current window size
         s = self.size()
         qp = QtGui.QPainter()
@@ -213,8 +191,8 @@ class TranslucentWidget(QWidget):
         # drawpopup
         qp.setPen(self.popup_penColor)
         qp.setBrush(self.popup_fillColor)
-        popup_width = 300
-        popup_height = 120
+        popup_width = self.popup_width
+        popup_height = self.popup_height
         ow = int(s.width() / 2 - popup_width / 2)
         oh = int(s.height() / 2 - popup_height / 2)
         qp.drawRoundedRect(ow, oh, popup_width, popup_height, 5, 5)
@@ -223,142 +201,399 @@ class TranslucentWidget(QWidget):
         font.setPixelSize(18)
         font.setBold(True)
         qp.setFont(font)
-        qp.setPen(QtGui.QColor(70, 70, 70))
-        tolw, tolh = 80, -5
-        qp.drawText(
-            ow + int(popup_width / 2) - tolw,
-            oh + int(popup_height / 2) - tolh,
-            "Will this work?",
-        )
-
+        # qp.setPen(QtGui.QColor(70, 70, 70))
+        # tolw, tolh = 80, -5
+        # qp.drawText(
+        #     ow + int(popup_width / 2) - tolw,
+        #     oh + int(popup_height / 2) - tolh,
+        #     "Will this work?",
+        # )
         qp.end()
 
     def _onclose(self):
-        self.logger.debug(f"Closed pop-up {__name__}")
+        self.logger.debug(f"Closed pop-up {self}")
         self.SIGNALS.CLOSE.emit()
 
+
+class SwitchPrivate(QtCore.QObject):
+    def __init__(self, q: QWidget, parent: QWidget = None) -> None:
+        QtCore.QObject.__init__(self, parent=parent)
+        self.mPointer = q
+        self.mPosition: float = 0.0
+        self.mGradient = QtGui.QLinearGradient()
+        self.mGradient.setSpread(QtGui.QGradient.Spread.PadSpread)
+
+        self.animation = QtCore.QPropertyAnimation(self)
+        self.animation.setTargetObject(self)
+        self.animation.setPropertyName(b'position')
+        self.animation.setStartValue(0.0)
+        self.animation.setEndValue(1.0)
+        self.animation.setDuration(200)
+        self.animation.setEasingCurve(QtCore.QEasingCurve(QtCore.QEasingCurve.Type.InOutCirc))
+
+        self.animation.finished.connect(self.mPointer.update)
+
+    @QtCore.pyqtProperty(float)
+    def position(self) -> float:
+        return self.mPosition
+
+    @position.setter
+    def position(self, value: float) -> None:
+        self.mPosition = value
+        self.mPointer.update()
+
+    def draw(self, painter: QtGui.QPainter) -> None:
+        r = self.mPointer.rect()
+        margin = r.height()/10
+        shadow = self.mPointer.palette().dark().color()
+        light = self.mPointer.palette().light().color()
+        button = self.mPointer.palette().button().color()
+        painter.setPen(Qt.PenStyle.NoPen)
+
+        self.mGradient.setColorAt(0, shadow.darker(130))
+        self.mGradient.setColorAt(1, light.darker(130))
+        self.mGradient.setStart(0, r.height())
+        self.mGradient.setFinalStop(0, 0)
+        painter.setBrush(self.mGradient)
+        painter.drawRoundedRect(r, r.height()/2, r.height()/2)
+
+        self.mGradient.setColorAt(0, shadow.darker(140))
+        self.mGradient.setColorAt(1, light.darker(160))
+        self.mGradient.setStart(0, 0)
+        self.mGradient.setFinalStop(0, r.height())
+        painter.setBrush(self.mGradient)
+        painter.drawRoundedRect(r.adjusted(margin, margin, -margin, -margin), r.height()/2, r.height()/2)
+
+        self.mGradient.setColorAt(0, button.darker(130))
+        self.mGradient.setColorAt(1, button)
+
+        painter.setBrush(self.mGradient)
+
+        x = r.height()/2.0 + self.mPosition*(r.width()-r.height())
+        painter.drawEllipse(QtCore.QPointF(x, r.height()/2), r.height()/2-margin, r.height()/2-margin)
+
+    @QtCore.pyqtSlot(bool, name='animate')
+    def animate(self, checked: bool) -> None:
+        self.animation.setDirection(QtCore.QPropertyAnimation.Direction.Forward if checked else QtCore.QPropertyAnimation.Direction.Backward)
+        self.animation.start()
+
+class Switch(QAbstractButton):
+    def __init__(self, parent: QWidget = None) -> None:
+        QAbstractButton.__init__(self, parent=parent)
+        self.dPtr = SwitchPrivate(self)
+        self.setCheckable(True)
+        self.clicked.connect(self.dPtr.animate)
+
+    def sizeHint(self):
+        return QtCore.QSize(64, 32)
+
+    def paintEvent(self, event):
+        painter = QtGui.QPainter(self)
+        painter.setRenderHint(QtGui.QPainter.RenderHints.Antialiasing)
+        self.dPtr.draw(painter)
+
+    def resizeEvent(self, event):
+        self.update()
 
 class SettingsMenu(TranslucentWidget):
     def __init__(self, parent: "MainWindow") -> None:
         super().__init__(parent)
-        # self.theme_id = False
         self.initUI()
 
     def initUI(self) -> None:
-        self.resize(150, 200)
         self.setLayout(QGridLayout())
-        self.theme_switch = QPushButton(
-            """<label class="switch">
-            <input type="checkbox">
-            <span class="slider round"></span>
-        </label>"""
-        )
+        margin_x = self.rect().width()//2 - self.popup_width//2 + 200
+        margin_y = self.rect().height()//2 - self.popup_height//2 + 200
+        self.logger.debug(f"Setting margins: {margin_x} {margin_y}, w: {self.width()} h: {self.height()}")
+        self.setContentsMargins(margin_x, margin_y, margin_x, margin_y)
+        self.theme_switch = Switch()
+        if QtCore.QSettings().value("styles/theme") == "dark":
+            self.theme_switch.click()
         self.theme_switch.clicked.connect(self.toggle_theme)
-        self.theme_switch.setStyleSheet(
-            """
 
- /* The switch - the box around the slider */
- .switch {
-    position: relative;
-    display: inline-block;
-    width: 60px;
-    height: 34px;
-  }
-  
-  /* Hide default HTML checkbox */
-  .switch input {
-    opacity: 0;
-    width: 0;
-    height: 0;
-  }
-  
-  /* The slider */
-  .slider {
-    position: absolute;
-    cursor: pointer;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    background-color: #ccc;
-    -webkit-transition: .4s;
-    transition: .4s;
-  }
-  
-  .slider:before {
-    position: absolute;
-    content: "";
-    height: 26px;
-    width: 26px;
-    left: 4px;
-    bottom: 4px;
-    background-color: white;
-    -webkit-transition: .4s;
-    transition: .4s;
-  }
-  
-  input:checked + .slider {
-    background-color: #2196F3;
-  }
-  
-  input:focus + .slider {
-    box-shadow: 0 0 1px #2196F3;
-  }
-  
-  input:checked + .slider:before {
-    -webkit-transform: translateX(26px);
-    -ms-transform: translateX(26px);
-    transform: translateX(26px);
-  }
-  
-  /* Rounded sliders */
-  .slider.round {
-    border-radius: 34px;
-  }
-  
-  .slider.round:before {
-    border-radius: 50%;
-  } 
-        """
-        )
         self.theme_switch_label = QLabel()
-        self.layout().addWidget(self.theme_switch, 0, 0)
-        self.layout().addWidget(self.theme_switch_label, 0, 1)
+
+        self.language_selector = QButtonGroup()
+        self.language_selector_label = QLabel()
+        for i, widgets in enumerate([
+            (self.theme_switch_label, self.theme_switch),
+            (self.language_selector_label, self.language_selector)
+        ]):
+            self.layout().addWidget(widgets[0], i, 0)
+            # self.layout().spacerItem()
+            self.layout().addWidget(widgets[1], i, 1)
         self.retranslateUI()
 
     def toggle_theme(self) -> None:
+        settings = QSettings("BoiarTech", config.PROJECT_NAME)
         themes = ["light", "dark"]
-        # self.theme_id = not self.theme_id
+        theme = themes[self.theme_switch.isChecked()]
         set_stylesheet(
-            QCoreApplication.instance(), themes[self.theme_switch.isChecked()]
+            QCoreApplication.instance(), theme
         )
+        QtCore.QSettings().setValue("styles/theme", theme)
 
     def retranslateUI(self) -> None:
         self.theme_switch_label.setText(
-            QCoreApplication.translate("QLabel", "Select theme")
+            QCoreApplication.translate("QLabel", "Use dark scheme")
+        )
+        self.language_selector_label.setText(
+            QCoreApplication.translate("QLabel", "Select language")
         )
 
 
-class LanguageMenu(TranslucentWidget):
-    pass
+class WordsetMenu(TranslucentWidget):
+    def __init__(self, parent: "MainWindow") -> None:
+        super().__init__(parent)
+        self.initUI()
+
+    def initUI(self) -> None:
+        self.setLayout(QHBoxLayout())
+        margin_x = self.rect().width()//2 - self.popup_width//2 + 200
+        margin_y = self.rect().height()//2 - self.popup_height//2 + 200
+        self.logger.debug(f"Setting margins: {margin_x} {margin_y}, w: {self.width()} h: {self.height()}")
+        self.setContentsMargins(margin_x, margin_y, margin_x, margin_y)
+
+        self.wordset_selector = QButtonGroup()
+        # self.theme_switch.clicked.connect(self.set_wordset)
+        # self.duration_selector_label = QLabel()
+        for _, widgets in enumerate([
+            self.wordset_selector
+        ]):
+            self.layout().addWidget(widgets[0])
+            # self.layout().spacerItem()
+            # self.layout().addWidget(widgets[1], i, 1)
+        self.retranslateUI()
+
+    def set_wordset(self, wordset: models.Wordset) -> None:
+        settings = QSettings("BoiarTech", config.PROJECT_NAME)
+        if wordset.id:
+            settings.setValue("game/options/wordset/id", wordset.id)
+        elif wordset.name:
+            settings.setValue("game/options/wordset/name", wordset.name)
+        else:
+            self.logger.error(f"Wordset {wordset} has incomplete data")
+
+    def retranslateUI(self) -> None:
+        pass
+        # self.duration_selector_label.setText(
+        #     QCoreApplication.translate("QLabel", "Select duration")
+        # )
+
+class AboutWindow(TranslucentWidget):
+    def __init__(self, parent: "MainWindow") -> None:
+        super().__init__(parent)
+        self.initUI()
+
+    def initUI(self) -> None:
+        self.setLayout(QGridLayout())
+        margin_x = self.rect().width()//2 - self.popup_width//2 + 200
+        margin_y = self.rect().height()//2 - self.popup_height//2 + 200
+        self.logger.debug(f"Setting margins: {margin_x} {margin_y}, w: {self.width()} h: {self.height()}")
+        self.setContentsMargins(margin_x, margin_y, margin_x, margin_y)
+        self.about_label = QLabel()
+
+        for i, widgets in enumerate([
+            (self.about_label),
+        ]):
+            self.layout().addWidget(widgets[0], i, 0)
+            # self.layout().spacerItem()
+            # self.layout().addWidget(widgets[1], i, 1)
+        self.retranslateUI()
+
+    def retranslateUI(self) -> None:
+        self.about_label.setText(
+            QCoreApplication.translate("QLabel", f"About {config.PROJECT_NAME}")
+        )
 
 
-class AboutPage(TranslucentWidget):
-    pass
+class UserStatsWindow(TranslucentWidget):
+    def __init__(self, parent: "MainWindow") -> None:
+        super().__init__(parent)
+        self.game_data = self.get_game_data()
+        self.initUI()
 
+    def initUI(self) -> None:
+        self.setLayout(QGridLayout())
+        margin_x = self.rect().width()//2 - self.popup_width//2 + 200
+        margin_y = self.rect().height()//2 - self.popup_height//2 + 200
+        self.logger.debug(f"Setting margins: {margin_x} {margin_y}, w: {self.width()} h: {self.height()}")
+        self.setContentsMargins(margin_x, margin_y, margin_x, margin_y)
+        self.title = QLabel()
+        self.title.setProperty("class", "heading")
+        self.wpm_plot = pg.PlotWidget()
+        accs, wpms, dates, incorrect_charss = list(zip(*self.game_data))
+        self.wpm_plot.plot(dates, wpms)
+        counter = Counter()
+        for chars in incorrect_charss:
+            counter.update(chars)
+        self.most_inaccurate_letters = counter.most_common(10)
+        self.avg_stats = [sum(i)/len(i) for i in [accs, wpms]]
+        # self.animal_speed_comparison = None
+        for i, widgets in enumerate([
+            (self.title)
+        ]):
+            self.layout().addWidget(widgets[0], i, 0)
+            # self.layout().spacerItem()
+            # self.layout().addWidget(widgets[1], i, 1)
+        self.retranslateUI()
+
+    def get_game_data(self) -> List[Tuple[float, float, float, str]]:
+        return database.get_game_data()
+
+    def retranslateUI(self) -> None:
+        self.title.setText(
+            QCoreApplication.translate("QLabel", "User statistics")
+        )
+
+
+class GameStatsWindow(TranslucentWidget):
+    def __init__(self, parent: "MainWindow") -> None:
+        super().__init__(parent)
+        self.initUI()
+
+    def initUI(self) -> None:
+        self.setLayout(QVBoxLayout())
+        margin_x = self.rect().width()//2 - self.popup_width//2 + 200
+        margin_y = self.rect().height()//2 - self.popup_height//2 + 200
+        self.logger.debug(f"Setting margins: {margin_x} {margin_y}, w: {self.width()} h: {self.height()}")
+        self.setContentsMargins(margin_x, margin_y, margin_x, margin_y)
+
+        self.title = QLabel()
+        stats = self.parent().game.get_stats()
+        # self.theme_switch.clicked.connect(self.set_mode)
+        # self.duration_selector_label = QLabel()
+        for _, widget in enumerate([
+            self.title
+        ]):
+            self.layout().addWidget(widget)
+            # self.layout().spacerItem()
+            # self.layout().addWidget(widgets[1], i, 1)
+        self.retranslateUI()
+
+    def retranslateUI(self) -> None:
+        self.title.setText(
+            QCoreApplication.translate("QLabel", "Game results")
+        )
+
+
+class PauseMenu(TranslucentWidget):
+    def __init__(self, parent: "MainWindow") -> None:
+        super().__init__(parent)
+        self.initUI()
+
+    def initUI(self) -> None:
+        self.setLayout(QVBoxLayout())
+        margin_x = self.rect().width()//2 - self.popup_width//2 + 200
+        margin_y = self.rect().height()//2 - self.popup_height//2 + 200
+        self.logger.debug(f"Setting margins: {margin_x} {margin_y}, w: {self.width()} h: {self.height()}")
+        self.setContentsMargins(margin_x, margin_y, margin_x, margin_y)
+        self.label = QLabel()
+        self.exit_button = QPushButton()
+        self.resume_button = QPushButton()
+        self.settings_button = QPushButton()
+        self.resume_button.clicked.connect(self.parent().resume)
+        self.exit_button.clicked.connect(self.parent().exit)
+        self.settings_button.clicked.connect(self.parent().show_settings)
+
+        for _, widget in enumerate([
+            self.label,
+            self.resume_button,
+            self.settings_button,
+            self.exit_button
+        ]):
+            self.layout().addWidget(widget)
+            # self.layout().spacerItem()
+            # self.layout().addWidget(widgets[1], i, 1)
+        self.retranslateUI()
+
+    def retranslateUI(self) -> None:
+        self.label.setText(
+            QCoreApplication.translate("QLabel", "Pause game")
+        )
+        self.resume_button.setText(
+            QCoreApplication.translate("QLabel", "Resume")
+        )
+        self.settings_button.setText(
+            QCoreApplication.translate("QLabel", "Settings")
+        )
+        self.exit_button.setText(
+            QCoreApplication.translate("QLabel", "Exit")
+        )
 
 class DurationMenu(TranslucentWidget):
-    pass
+    def __init__(self, parent: "MainWindow") -> None:
+        super().__init__(parent)
+        self.initUI()
+
+    def initUI(self) -> None:
+        self.setLayout(QHBoxLayout())
+        margin_x = self.rect().width()//2 - self.popup_width//2 + 200
+        margin_y = self.rect().height()//2 - self.popup_height//2 + 200
+        self.logger.debug(f"Setting margins: {margin_x} {margin_y}, w: {self.width()} h: {self.height()}")
+        self.setContentsMargins(margin_x, margin_y, margin_x, margin_y)
+
+        self.duration_selector = QButtonGroup()
+        # self.theme_switch.clicked.connect(self.set_duration)
+
+        # self.duration_selector_label = QLabel()
+        for _, widgets in enumerate([
+            self.duration_selector
+        ]):
+            self.layout().addWidget(widgets[0])
+            # self.layout().spacerItem()
+            # self.layout().addWidget(widgets[1], i, 1)
+        self.retranslateUI()
+
+    def set_duration(self, duration: int = 30) -> None:
+        settings = QSettings("BoiarTech", config.PROJECT_NAME)
+        settings.setValue("game/options/duration", duration)
+
+    def retranslateUI(self) -> None:
+        pass
+        # self.duration_selector_label.setText(
+        #     QCoreApplication.translate("QLabel", "Select duration")
+        # )
 
 
 class ModeMenu(TranslucentWidget):
-    pass
+    def __init__(self, parent: "MainWindow") -> None:
+        super().__init__(parent)
+        self.initUI()
+
+    def initUI(self) -> None:
+        self.setLayout(QHBoxLayout())
+        margin_x = self.rect().width()//2 - self.popup_width//2 + 200
+        margin_y = self.rect().height()//2 - self.popup_height//2 + 200
+        self.logger.debug(f"Setting margins: {margin_x} {margin_y}, w: {self.width()} h: {self.height()}")
+        self.setContentsMargins(margin_x, margin_y, margin_x, margin_y)
+
+        self.wordset_selector = QButtonGroup()
+        self.theme_switch.clicked.connect(self.set_mode)
+        # self.duration_selector_label = QLabel()
+        for _, widgets in enumerate([
+            self.wordset_selector
+        ]):
+            self.layout().addWidget(widgets[0])
+            # self.layout().spacerItem()
+            # self.layout().addWidget(widgets[1], i, 1)
+        self.retranslateUI()
+
+    def set_mode(self, mode: str = "default") -> None:
+        settings = QSettings("BoiarTech", config.PROJECT_NAME)
+        settings.setValue("game/options/mode", mode)
+
+    def retranslateUI(self) -> None:
+        pass
+        # self.duration_selector_label.setText(
+        #     QCoreApplication.translate("QLabel", "Select duration")
+        # )
 
 
 class TypingHintLabel(QLabel):
     """Label displaying user typed input."""
 
-    def __init__(self, parent: "MainWindow" = None, *flags):
+    def __init__(self, parent: 'MainWindow' = None, *flags):
         super().__init__(parent, *flags)
         self.logger = logging.getLogger(__name__)
         self.max_chars: float = 0
@@ -392,10 +627,10 @@ class TypingHintLabel(QLabel):
                 f"Invalid char list (length {len(char_list)}, min pos: {self.min_char_pos}): {char_list[:10]}..."
             )
             return False
-        self.logger.debug(f"Char list: {char_list}")
-        self.logger.debug(f"Remaining text: {remaining_text}")
+        # self.logger.debug(f"Char list: {char_list}")
+        # self.logger.debug(f"Remaining text: {remaining_text}")
         self.logger.debug(
-            f"Setting rich text {''.join(char_list+list(remaining_text))}"
+            f"Setting rich text {''.join(char_list+list(remaining_text))[:40]}..."
         )
         self.setText("".join(char_list + list(remaining_text)))
         return True
@@ -418,6 +653,10 @@ class TypingHintLabel(QLabel):
             max_px_length / 1.4
         )  # TODO self.fontMetrics().boundingRectChar("m").width()
         self.char_line_width = self.label_width / 1.4
+        inp = QLineEdit()
+        inp.setText(self.parent().game.text)
+        self.logger.debug(inp.cursorPositionAt(self.geometry().topRight()))
+        inp.clear()
         self.logger.debug(
             f"Max chars: {self.max_chars}; label width: {self.label_width}; px_length: {max_px_length}; font width {self.fontMetrics().averageCharWidth()}"
         )
@@ -433,15 +672,15 @@ class TypingHintLabel(QLabel):
         super().paintEvent(a0)
 
     def newline(self) -> None:
-        self.logger.debug("Newline")
         if self.line_pos == 0:
             self.line_pos += 1
-        if self.line_pos == 1:
+        elif self.line_pos == 1:
             # TODO reset caret
             self.min_char_pos += int(self.char_line_width)
             self.logger.debug(
                 f"Set new starting position: {self.min_char_pos}"
             )
+        self.logger.debug(f"Newline: {self.line_pos}")
         self.setCharList()
         # self.setText(self.parent().words[self.parent()._pos:])
         # TODO
@@ -458,7 +697,6 @@ class MainWindow(QWidget):
     def __init__(self, icon: QIcon) -> None:
         super().__init__()
         self.logger = logging.getLogger(__name__)
-        self.settings = QSettings("BoiarTech", config.PROJECT_NAME, self)
         self.timer = QtCore.QTimer()
         self.icon = icon
         self.game = TypingGame()
@@ -501,6 +739,9 @@ class MainWindow(QWidget):
         self.settings_menu.hide()
         self.button_settings.clicked.connect(self.show_settings)
         self.button_about = QPushButton()
+        self.about_popup = AboutPage(self)
+        self.about_popup.hide()
+        self.button_about.clicked.connect(self.show_about)
         self.button_stats = QPushButton()
         self.button_stats.setProperty("class", "highlighted")
         self.button_exit = QPushButton()
@@ -591,6 +832,7 @@ class MainWindow(QWidget):
         self.game.finish_or_pause()
         # self.timer.pause() # TODO
         popup.show()
+        self._popframe = popup
         # self._popframe.move(0, 0)
         # self._popframe.resize(self.width(), self.height())
         # self._popframe.SIGNALS.CLOSE.connect(self._closepopup)
@@ -598,7 +840,8 @@ class MainWindow(QWidget):
         # self.game.finish_or_pause()
         # self._popframe.show()
 
-    def _closepopup(self, popup: TranslucentWidget) -> None:
+    def _closepopup(self) -> None:
+        popup = self._popframe
         popup.close()
         self._popflag = False
 
@@ -671,13 +914,14 @@ class MainWindow(QWidget):
         self.game.start_or_resume()
 
     def display_results(self) -> None:
-        pass
+        self.logger.info(f"Finished game {self.game.get_stats()}")
 
     def finish_game(self, save: bool = False) -> None:
         self.logger.debug("Trying to finish game?")
         if not self.game.finish_or_pause(save=save):
-            return
+            return None
         self.words_to_type_label.formattedCharList.clear()
+        self.words_to_type_label.line_pos = 0
         self.update_timer.stop()
         # self.game.save()
         self.display_results()

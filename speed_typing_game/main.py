@@ -31,17 +31,31 @@ def main() -> None:
 
     translator = QtCore.QTranslator()
     # system_locale = QtCore.QLocale.system().name()
-    locale = get_supported_locale()[0]
-    # locale = "pl_PL"
+    # locale = get_supported_locale()[0]
+    QtCore.QCoreApplication.setApplicationName(config.PROJECT_NAME)
+    QtCore.QCoreApplication.setOrganizationName("BoiarTech")
+    QtCore.QCoreApplication.setOrganizationDomain("boiartech.com")
+    settings = QtCore.QSettings()
+    if settings.contains("styles/theme"):
+        theme = settings.value("styles/theme")
+        logger.debug(f"Retrieved theme from settings: {theme}")
+    else:
+        theme = "dark"
+        settings.setValue("styles/theme", theme)
+    if settings.contains("localization/locale"):
+        locale = settings.value("localization/locale")
+        logger.debug(f"Retrieved locale from settings: {locale}")
+    else:
+        locale = "pl_PL"
+        settings.setValue("localization/locale", locale)
     if translator.load(locale + ".qm", config.RESOURCES_DIR + "/translate/"):
         app.installTranslator(translator)
         logger.debug(f"Set locale: {locale}")
     else:
         logger.debug(f"Set locale: {config.DEFAULT_LOCALE}")
 
-    # theme =  detect_dark_theme_os()
-    theme = "dark"
     palette_name = get_color_palette_names(theme)[0]
+ 
     set_stylesheet(app, theme, palette_name)
     icon = QIcon(
         os.path.join(

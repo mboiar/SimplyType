@@ -1,6 +1,9 @@
 import logging
 from functools import lru_cache
 from typing import Iterable, List, Tuple
+from collections import Counter
+import time
+import datetime
 
 from PyQt6.QtSql import QSqlDatabase, QSqlQuery, QSqlQueryModel
 
@@ -38,6 +41,8 @@ createGameTableQueryString = f"""
                 incorrect_chars TEXT,
                 elapsed REAL,
                 created_at REAL NOT NULL UNIQUE,
+                word_count INTEGER,
+                last_updated REAL
                 FOREIGN KEY (wordset_id)
                     REFERENCES {config.WORDSET_TABLE} (id)
                     ON DELETE SET NULL
@@ -69,9 +74,11 @@ insertGameQueryString = f"""
             pos,
             incorrect_chars,
             elapsed,
-            created_at
+            created_at,
+            word_count,
+            last_updated
         )
-        VALUES (?, ?, ?, ?, ?, ?, ?)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
         """
 
 deleteWordsetTableQueryStr = """DROP TABLE wordsets"""
@@ -272,7 +279,9 @@ def add_games_to_database(games: Iterable["models.TypingGame"]) -> bool:
         incorrect_charss,
         elapseds,
         created_ats,
-    ) = ([], [], [], [], [], [], [])
+        word_counts,
+        last_updateds
+    ) = ([], [], [], [], [], [], [], [], [])
     for game in games:
         logger.debug(f"Preparing {game} for database insertion")
         if not all((game.wordset, game.seed, game.elapsed)):
@@ -287,6 +296,8 @@ def add_games_to_database(games: Iterable["models.TypingGame"]) -> bool:
         incorrect_charss.append(game.incorrect_chars)
         elapseds.append(game.elapsed)
         created_ats.append(game.start_time)
+        word_counts.append(game.get_word_count())
+        last_updateds.append(game.last_paused)
     if created_ats:
         insertGameQuery.addBindValue(modes)
         insertGameQuery.addBindValue(wordset_ids)
@@ -295,6 +306,8 @@ def add_games_to_database(games: Iterable["models.TypingGame"]) -> bool:
         insertGameQuery.addBindValue(incorrect_charss)
         insertGameQuery.addBindValue(elapseds)
         insertGameQuery.addBindValue(created_ats)
+        insertGameQuery.addBindValue(word_counts)
+        insertGameQuery.addBindValue(last_updateds)
         if not insertGameQuery.execBatch():
             logger.error(
                 f"Unable to insert values into table '{game_tablename}':\n"
@@ -328,3 +341,44 @@ def get_available_wordsets_ids() -> List[int]:
         ids.append(query.value(0))
     logger.debug(f"Retrieved indices of wordsets in database: {ids}")
     return ids
+
+def get_game_data(period: Tuple[float, float] = (time.time(), (datetime.date.today().replace(day=1) - datetime.timedelta(days=1)-datetime.datetime(1970,1,1)).total_seconds())) -> List[Tuple[float, float, float, str]]:
+    con_name = config.CON_NAME
+    game_tablename = config.GAME_TABLE
+    db = QSqlDatabase.database(con_name)
+    if not db.open():
+        logger.error(f"Could not open database connection {con_name}")
+        return False
+    # if not check_table_exists(game_tablename, con_name):
+    if not check_table_exists(game_tablename, con_name):
+        logger.error(
+                f"Table {game_tablename} does not exist"
+            )
+
+    queryStr = f"""
+        SELECT incorrect_chars, elapsed, pos, last_updated, word_count from {game_tablename}
+        WHERE last_updated BETWEEN ? AND ?
+    """
+    query = QSqlQuery(db)
+    query.prepare(queryStr)
+    query.addBindValue(period[0])
+    query.addBindValue(period[1])
+    if not query.exec(queryStr):
+        logger.error(
+            f"Unable to get data stats from {game_tablename} for time period {period[0].strftime()}-{period[1].strftime()}\n"
+            + query.lastError().text()
+        )
+        return [(), ()]
+    accs, wpms, dates, incorrect_charss = [], [], [], []
+    while query.next():
+        incorrect_chars = query.value(0)
+        elapsed = query.value(1)
+        pos = query.value(2)
+        last_updated = query.value(3)
+        word_count = query.value(4)
+        accs.append(1-len(incorrect_chars)/pos)
+        wpms.append(word_count/elapsed*60)
+        dates.append(last_updated)
+        incorrect_charss.append(incorrect_chars)
+    logger.debug(f"Retrieved game data {incorrect_charss[:10]}... {accs[:10]}... {wpms[:10]}... {dates[:10]}...")
+    return zip(accs, wpms, dates, incorrect_charss)

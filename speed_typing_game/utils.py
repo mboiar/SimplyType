@@ -17,6 +17,7 @@ import logging
 import os
 from datetime import datetime as dt
 from typing import Dict, List, Tuple, Union, Optional
+from functools import lru_cache
 
 from PyQt6.QtGui import QColor, QPalette
 from PyQt6.QtSql import QSqlDatabase
@@ -31,10 +32,10 @@ def set_stylesheet(
     object: QObject, theme: str, palette_name: Optional[str] = None
 ) -> None:
     """Set stylesheet with a given palette on the widget."""
-    logger.debug(
-        f"Attempting to set color palette of {object} to {palette_name} ({theme})"
-    )
     palette_name, palette = get_color_palette(theme, palette_name)
+    logger.debug(
+        f"Attempting to set color palette of {object} to '{palette_name}' ({theme})"
+    )
     template_path = os.path.join(
         config.RESOURCES_DIR, "styles", "template.css"
     )
@@ -79,7 +80,7 @@ def set_stylesheet(
     )
     object.setPalette(current_palette)
 
-
+@lru_cache(maxsize=4)
 def get_color_palette_names(theme: str) -> List[str]:
     """Retrieve available palette names for a dark or light theme."""
     theme_path = os.path.join(config.RESOURCES_DIR, "styles", theme)
@@ -89,7 +90,7 @@ def get_color_palette_names(theme: str) -> List[str]:
     )
     return palette_names
 
-
+@lru_cache(maxsize=10)
 def get_color_palette(theme: str, palette_name: Optional[str] = "") -> Tuple[str, Dict]:
     """Retrieve a dict with colors for a given palette name."""
     if not palette_name or not os.path.exists(
@@ -98,11 +99,11 @@ def get_color_palette(theme: str, palette_name: Optional[str] = "") -> Tuple[str
         )
     ):
         default_palette_name = get_color_palette_names(theme)[0]
-        palette_name = default_palette_name
         logger.warning(
             f"Palette {palette_name} with theme {theme} does not exist.\n\
                 Using default palette {default_palette_name} ({theme})."
         )
+        palette_name = default_palette_name
     palette_path = os.path.join(
         config.RESOURCES_DIR, "styles", theme, palette_name, "colors.json"
     )
@@ -139,7 +140,7 @@ def create_connection(db_name: str, con_name: str) -> bool:
         return False
     return True
 
-
+@lru_cache
 def get_supported_locale() -> List[str]:
     translation_path = os.path.join(config.RESOURCES_DIR, "translate")
     locale_names = [
