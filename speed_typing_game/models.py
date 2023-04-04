@@ -314,7 +314,10 @@ class TypingGame:
 
     def get_accuracy(self) -> float:
         """Calculate accuracy as (1 - number of incorrect characters / number of entered characters)."""
-        return (self.pos - sum(self.incorrect_chars.values())) / self.pos
+        if self.pos > 0:
+            return (self.pos - sum(self.incorrect_chars.values())) / self.pos
+        else:
+            return None
 
     def get_incorrect_char_freq(self) -> List[Tuple[str, int]]:
         """Return a list of pairs (incorrect character, incorrect character count)."""

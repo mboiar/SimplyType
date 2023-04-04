@@ -317,7 +317,7 @@ class SettingsMenu(TranslucentWidget):
         self.language_selector_label = QLabel()
         for i, widgets in enumerate([
             (self.theme_switch_label, self.theme_switch),
-            (self.language_selector_label, self.language_selector)
+            # (self.language_selector_label, self.language_selector)
         ]):
             self.layout().addWidget(widgets[0], i, 0)
             # self.layout().spacerItem()
@@ -358,9 +358,9 @@ class WordsetMenu(TranslucentWidget):
         # self.theme_switch.clicked.connect(self.set_wordset)
         # self.duration_selector_label = QLabel()
         for _, widgets in enumerate([
-            self.wordset_selector
+            # self.wordset_selector
         ]):
-            self.layout().addWidget(widgets[0])
+            self.layout().addWidget(widgets)
             # self.layout().spacerItem()
             # self.layout().addWidget(widgets[1], i, 1)
         self.retranslateUI()
@@ -396,7 +396,7 @@ class AboutWindow(TranslucentWidget):
         for i, widgets in enumerate([
             (self.about_label),
         ]):
-            self.layout().addWidget(widgets[0], i, 0)
+            self.layout().addWidget(widgets, i, 0)
             # self.layout().spacerItem()
             # self.layout().addWidget(widgets[1], i, 1)
         self.retranslateUI()
@@ -433,7 +433,7 @@ class UserStatsWindow(TranslucentWidget):
         for i, widgets in enumerate([
             (self.title)
         ]):
-            self.layout().addWidget(widgets[0], i, 0)
+            self.layout().addWidget(widgets, i, 0)
             # self.layout().spacerItem()
             # self.layout().addWidget(widgets[1], i, 1)
         self.retranslateUI()
@@ -493,7 +493,7 @@ class PauseMenu(TranslucentWidget):
         self.resume_button = QPushButton()
         self.settings_button = QPushButton()
         self.resume_button.clicked.connect(self.parent().resume)
-        self.exit_button.clicked.connect(self.parent().exit)
+        self.exit_button.clicked.connect(self.parent().close)
         self.settings_button.clicked.connect(self.parent().show_settings)
 
         for _, widget in enumerate([
@@ -538,9 +538,9 @@ class DurationMenu(TranslucentWidget):
 
         # self.duration_selector_label = QLabel()
         for _, widgets in enumerate([
-            self.duration_selector
+            # self.duration_selector
         ]):
-            self.layout().addWidget(widgets[0])
+            self.layout().addWidget(widgets)
             # self.layout().spacerItem()
             # self.layout().addWidget(widgets[1], i, 1)
         self.retranslateUI()
@@ -569,12 +569,11 @@ class ModeMenu(TranslucentWidget):
         self.setContentsMargins(margin_x, margin_y, margin_x, margin_y)
 
         self.wordset_selector = QButtonGroup()
-        self.theme_switch.clicked.connect(self.set_mode)
         # self.duration_selector_label = QLabel()
         for _, widgets in enumerate([
-            self.wordset_selector
+            # self.wordset_selector
         ]):
-            self.layout().addWidget(widgets[0])
+            self.layout().addWidget(widgets)
             # self.layout().spacerItem()
             # self.layout().addWidget(widgets[1], i, 1)
         self.retranslateUI()
@@ -738,8 +737,15 @@ class MainWindow(QWidget):
         self.settings_menu = SettingsMenu(self)
         self.settings_menu.hide()
         self.button_settings.clicked.connect(self.show_settings)
+        self.button_pause = QPushButton()
+        self.pause_menu = PauseMenu(self)
+        self.pause_menu.hide()
+        # self.button_pause.clicked.connect(self.pause)
+        self.gamestats_window = GameStatsWindow(self)
+        self.gamestats_window.hide()
+        # self.button_gamestats.clicked.connect(self.show_settings)
         self.button_about = QPushButton()
-        self.about_popup = AboutPage(self)
+        self.about_popup = AboutWindow(self)
         self.about_popup.hide()
         self.button_about.clicked.connect(self.show_about)
         self.button_stats = QPushButton()
@@ -823,6 +829,18 @@ class MainWindow(QWidget):
 
     def show_settings(self) -> None:
         self.show_popup(self.settings_menu)
+    
+    def show_game_stats(self) -> None:
+        self.show_popup(self.gamestats_window)
+    
+    def show_about(self) -> None:
+        self.show_popup(self.about_popup)
+    
+    def pause(self) -> None:
+        self.show_popup(self.pause_menu)
+
+    def resume(self) -> None:
+        pass
 
     def show_popup(self, popup: TranslucentWidget) -> None:
         popup.move(0, 0)
@@ -881,10 +899,16 @@ class MainWindow(QWidget):
         )
 
     def init_game(
-        self, wordset_id=None, mode=None, duration=None, seed=None
+        self, wordset_id: Optional[int] = None, mode: Optional[str] = None, duration: Optional[int] = None, seed: Optional[int] = None
     ) -> None:
+        settings = QSettings("BoiarTech", config.PROJECT_NAME)
+        options = {"wordset/id":wordset_id, "mode":mode, "duration":duration, "seed":seed}
+        for (option, val) in options.items():
+            if val is None and settings.contains(f"game/options/{option}"):
+                options[option] = settings.value(f"game/options/{option}")
+                self.logger.debug(f"Retrieved '{option}' from settings: {val}")
         self.game = TypingGame(
-            wordset_id=wordset_id, mode=mode, duration=duration, seed=seed
+            wordset_id=options["wordset/id"], mode=options["mode"], duration=options["duration"], seed=options["seed"]
         )
         self.words_to_type_label.min_char_pos = self.game.pos
         self.logger.debug(f"Setting starting label position {self.game.pos}")
@@ -924,7 +948,7 @@ class MainWindow(QWidget):
         self.words_to_type_label.line_pos = 0
         self.update_timer.stop()
         # self.game.save()
-        self.display_results()
+        self.show_game_stats()
         self.words_to_type_label.label_caret.move(0, 0)
         self.init_game()
 

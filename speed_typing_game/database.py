@@ -342,7 +342,7 @@ def get_available_wordsets_ids() -> List[int]:
     logger.debug(f"Retrieved indices of wordsets in database: {ids}")
     return ids
 
-def get_game_data(period: Tuple[float, float] = (time.time(), (datetime.date.today().replace(day=1) - datetime.timedelta(days=1)-datetime.datetime(1970,1,1)).total_seconds())) -> List[Tuple[float, float, float, str]]:
+def get_game_data(period: Tuple[float, float] = (time.time(), (datetime.date.today().replace(day=1) - datetime.timedelta(days=1)-datetime.date(1970,1,1)).total_seconds())) -> List[Tuple[float, float, float, str]]:
     con_name = config.CON_NAME
     game_tablename = config.GAME_TABLE
     db = QSqlDatabase.database(con_name)
