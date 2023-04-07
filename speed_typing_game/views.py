@@ -20,6 +20,7 @@ from PyQt6.QtGui import (QCursor, QDesktopServices, QFontMetrics, QIcon,
 from PyQt6.QtWidgets import (QButtonGroup, QFileDialog, QGridLayout, QGroupBox,
                              QHBoxLayout, QLabel, QLineEdit, QListView,
                              QPushButton, QVBoxLayout, QWidget, QAbstractButton)
+from PyQt6 import QtWidgets
 import pyqtgraph as pg
 
 from speed_typing_game import config, models, database
@@ -299,6 +300,11 @@ class SettingsMenu(TranslucentWidget):
     def __init__(self, parent: "MainWindow") -> None:
         super().__init__(parent)
         self.initUI()
+        
+    def show(self) -> None:
+        if QtCore.QSettings().value("styles/theme") == "dark":
+            self.theme_switch.setChecked(True)
+        super().show()
 
     def initUI(self) -> None:
         self.setLayout(QGridLayout())
@@ -307,8 +313,6 @@ class SettingsMenu(TranslucentWidget):
         self.logger.debug(f"Setting margins: {margin_x} {margin_y}, w: {self.width()} h: {self.height()}")
         self.setContentsMargins(margin_x, margin_y, margin_x, margin_y)
         self.theme_switch = Switch()
-        if QtCore.QSettings().value("styles/theme") == "dark":
-            self.theme_switch.click()
         self.theme_switch.clicked.connect(self.toggle_theme)
 
         self.theme_switch_label = QLabel()
@@ -342,10 +346,67 @@ class SettingsMenu(TranslucentWidget):
         )
 
 
+class WordsetFileSelectWindow(TranslucentWidget):
+    def __init__(self, parent: "MainWindow") -> None:
+        super().__init__(parent)
+        self.initUI()
+
+    def initUI(self) -> None:
+        self.setLayout(QGridLayout())
+        margin_x = self.rect().width()//2 - self.popup_width//2 + 200
+        margin_y = self.rect().height()//2 - self.popup_height//2 + 200
+        self.logger.debug(f"Setting margins: {margin_x} {margin_y}, w: {self.width()} h: {self.height()}")
+        self.setContentsMargins(margin_x, margin_y, margin_x, margin_y)
+
+        self.wordset_list_view = QListView()
+        self.wordset_from_file_button = QPushButton("Choose file containing wordset", self)
+        self.wordset_from_file_button.clicked.connect(self.get_set_wordset)
+        self.save_to_database_checkbox = QtWidgets.QCheckBox(self)
+        self.save_to_database_label = QLabel(self)
+        for i, widgets in enumerate([
+            (self.wordset_from_file_button, ),
+            (self.save_to_database_label, self.save_to_database_checkbox)
+        ]):
+            for j, widget in enumerate(widgets):
+                self.layout().addWidget(widget, i, j)
+            # self.layout().spacerItem()
+            # self.layout().addWidget(widgets[1], i, 1)
+        self.retranslateUI()
+
+    def get_wordset_filename_from_user_input(self) -> Optional[str]:
+        file_name, selected_filter = QFileDialog.getOpenFileName(
+            self, QCoreApplication.translate("QFileDialog", "Load wordset"),
+            "",
+            QCoreApplication.translate("QFileDialog", "text files (*.txt *.csv)")
+            )
+        if file_name is not None:
+            self.logger.info(f"Received filename from user input: {file_name}")
+        else:
+            self.logger.warning(f"No wordset file selected")
+            return None
+        return file_name
+    
+    def get_set_wordset(self) -> None:
+        filename = self.get_wordset_filename_from_user_input()
+        if filename:
+            wordset = models.Wordset.from_file(filename)
+            if wordset:
+                self.parent().set_wordset(wordset, self.save_to_database_checkbox.isChecked())
+            
+    
+    def retranslateUI(self) -> None:
+        self.save_to_database_label.setText(
+            QCoreApplication.translate("QLabel", "Add wordset to database")
+        )
+
+
 class WordsetMenu(TranslucentWidget):
     def __init__(self, parent: "MainWindow") -> None:
         super().__init__(parent)
         self.initUI()
+        
+    def show(self) -> None:
+        super().show()
 
     def initUI(self) -> None:
         self.setLayout(QHBoxLayout())
@@ -354,31 +415,41 @@ class WordsetMenu(TranslucentWidget):
         self.logger.debug(f"Setting margins: {margin_x} {margin_y}, w: {self.width()} h: {self.height()}")
         self.setContentsMargins(margin_x, margin_y, margin_x, margin_y)
 
-        self.wordset_selector = QButtonGroup()
-        # self.theme_switch.clicked.connect(self.set_wordset)
-        # self.duration_selector_label = QLabel()
+        self.wordset_list_view = QListView()
+        self.wordset_from_file_button = QPushButton("Custom")
+        self.wordset_from_file_window = WordsetFileSelectWindow(self)
+        self.wordset_from_file_button.clicked.connect(lambda: self.parent().show_popup(self.wordset_from_file_window))
         for _, widgets in enumerate([
-            # self.wordset_selector
+            (self.wordset_from_file_button),
         ]):
             self.layout().addWidget(widgets)
             # self.layout().spacerItem()
             # self.layout().addWidget(widgets[1], i, 1)
         self.retranslateUI()
 
-    def set_wordset(self, wordset: models.Wordset) -> None:
+    def set_wordset(self, wordset: models.Wordset, add_to_database: bool = False) -> None:
         settings = QSettings("BoiarTech", config.PROJECT_NAME)
+        set_wordset = False
         if wordset.id:
             settings.setValue("game/options/wordset/id", wordset.id)
+            set_wordset = True
         elif wordset.name:
             settings.setValue("game/options/wordset/name", wordset.name)
-        else:
-            self.logger.error(f"Wordset {wordset} has incomplete data")
+            set_wordset = True
+
+        if set_wordset:
+            self.logger.info(f"Set default wordset {wordset}")
+            if add_to_database:
+                wordset.save()
+            return None
+        self.logger.error(f"Could not set wordset: wordset {wordset} has incomplete data")
 
     def retranslateUI(self) -> None:
         pass
         # self.duration_selector_label.setText(
         #     QCoreApplication.translate("QLabel", "Select duration")
         # )
+
 
 class AboutWindow(TranslucentWidget):
     def __init__(self, parent: "MainWindow") -> None:
@@ -410,8 +481,28 @@ class AboutWindow(TranslucentWidget):
 class UserStatsWindow(TranslucentWidget):
     def __init__(self, parent: "MainWindow") -> None:
         super().__init__(parent)
-        self.game_data = self.get_game_data()
+        self.game_data = None
         self.initUI()
+
+    def _update(self) -> None:
+        self.game_data = self.get_game_data()
+        
+    def show(self) -> None:
+        self._update()
+        # self.wpm_plot = pg.PlotWidget()
+        self.most_inaccurate_letters = [()]
+        self.avg_stats = []
+        self.animal_speed_comparison = None
+        if self.game_data:
+            accs, wpms, dates, incorrect_charss = list(zip(*self.game_data))
+        # self.wpm_plot.plot(dates, wpms)
+            counter = Counter()
+            for chars in incorrect_charss:
+                counter.update(chars)
+            self.most_inaccurate_letters = counter.most_common(10)
+            self.avg_stats = [sum(i)/len(i) for i in [accs, wpms]]
+        # TODO
+        super().show()        
 
     def initUI(self) -> None:
         self.setLayout(QGridLayout())
@@ -421,15 +512,7 @@ class UserStatsWindow(TranslucentWidget):
         self.setContentsMargins(margin_x, margin_y, margin_x, margin_y)
         self.title = QLabel()
         self.title.setProperty("class", "heading")
-        self.wpm_plot = pg.PlotWidget()
-        accs, wpms, dates, incorrect_charss = list(zip(*self.game_data))
-        self.wpm_plot.plot(dates, wpms)
-        counter = Counter()
-        for chars in incorrect_charss:
-            counter.update(chars)
-        self.most_inaccurate_letters = counter.most_common(10)
-        self.avg_stats = [sum(i)/len(i) for i in [accs, wpms]]
-        # self.animal_speed_comparison = None
+
         for i, widgets in enumerate([
             (self.title)
         ]):
@@ -438,7 +521,7 @@ class UserStatsWindow(TranslucentWidget):
             # self.layout().addWidget(widgets[1], i, 1)
         self.retranslateUI()
 
-    def get_game_data(self) -> List[Tuple[float, float, float, str]]:
+    def get_game_data(self) -> Optional[List[Tuple[float, float, float, str]]]:
         return database.get_game_data()
 
     def retranslateUI(self) -> None:
@@ -452,30 +535,57 @@ class GameStatsWindow(TranslucentWidget):
         super().__init__(parent)
         self.initUI()
 
+    def show(self) -> None:
+        stats = self.parent().game.get_stats()
+        if stats:
+            self.wpm_data.setText(f"{stats['wpm']:.0f} wpm")
+            self.accuracy_data.setText(f"{stats['accuracy']*100:.0f}%")
+            most_frequent = sorted(stats["incorrect characters frequency"], key=lambda x: x[1])[:5]
+            self.incorrect_chars_data.setText(" ".join([f"'{i[0]}' ({i[1]})" for i in most_frequent]))
+        super().show()
+
     def initUI(self) -> None:
-        self.setLayout(QVBoxLayout())
+        self.setLayout(QGridLayout())
         margin_x = self.rect().width()//2 - self.popup_width//2 + 200
         margin_y = self.rect().height()//2 - self.popup_height//2 + 200
         self.logger.debug(f"Setting margins: {margin_x} {margin_y}, w: {self.width()} h: {self.height()}")
         self.setContentsMargins(margin_x, margin_y, margin_x, margin_y)
 
         self.title = QLabel()
-        stats = self.parent().game.get_stats()
+        self.wpm_label = QLabel()
+        self.wpm_data = QLabel()
+        self.accuracy_label = QLabel()
+        self.accuracy_data = QLabel()
+        self.incorrect_chars_label = QLabel()
+        self.incorrect_chars_data = QLabel()
+        self.button_continue = QPushButton("Continue")
+        self.button_continue.clicked.connect(self.close_btn.click)
         # self.theme_switch.clicked.connect(self.set_mode)
         # self.duration_selector_label = QLabel()
-        for _, widget in enumerate([
-            self.title
+        for i, widgets in enumerate([
+            (self.title,),
+            (self.wpm_label, self.wpm_data),
+            (self.accuracy_label, self.accuracy_data),
+            (self.incorrect_chars_label, self.incorrect_chars_data),
+            (self.button_continue,)
         ]):
-            self.layout().addWidget(widget)
-            # self.layout().spacerItem()
-            # self.layout().addWidget(widgets[1], i, 1)
+            for j, widget in enumerate(widgets):
+                self.layout().addWidget(widget, i, j)
         self.retranslateUI()
 
     def retranslateUI(self) -> None:
         self.title.setText(
             QCoreApplication.translate("QLabel", "Game results")
         )
-
+        self.wpm_label.setText(
+            QCoreApplication.translate("QLabel", "Speed")
+        )
+        self.accuracy_label.setText(
+            QCoreApplication.translate("QLabel", "Accuracy")
+        )
+        self.incorrect_chars_label.setText(
+            QCoreApplication.translate("QLabel", "Most frequent incorrect characters")
+        )
 
 class PauseMenu(TranslucentWidget):
     def __init__(self, parent: "MainWindow") -> None:
@@ -494,7 +604,7 @@ class PauseMenu(TranslucentWidget):
         self.settings_button = QPushButton()
         self.resume_button.clicked.connect(self.parent().resume)
         self.exit_button.clicked.connect(self.parent().close)
-        self.settings_button.clicked.connect(self.parent().show_settings)
+        self.settings_button.clicked.connect(lambda: self.parent().show_popup(self.parent().settings_menu))
 
         for _, widget in enumerate([
             self.label,
@@ -520,6 +630,7 @@ class PauseMenu(TranslucentWidget):
         self.exit_button.setText(
             QCoreApplication.translate("QLabel", "Exit")
         )
+
 
 class DurationMenu(TranslucentWidget):
     def __init__(self, parent: "MainWindow") -> None:
@@ -735,32 +846,49 @@ class MainWindow(QWidget):
         self.sidebarLayout = QVBoxLayout()
         self.button_settings = QPushButton()
         self.settings_menu = SettingsMenu(self)
-        self.settings_menu.hide()
-        self.button_settings.clicked.connect(self.show_settings)
+        pixmapi = QtWidgets.QStyle.StandardPixmap.SP_MediaPlay
+        icon = self.style().standardIcon(pixmapi)
         self.button_pause = QPushButton()
+        self.button_pause.setIcon(icon)
         self.pause_menu = PauseMenu(self)
-        self.pause_menu.hide()
-        # self.button_pause.clicked.connect(self.pause)
         self.gamestats_window = GameStatsWindow(self)
-        self.gamestats_window.hide()
-        # self.button_gamestats.clicked.connect(self.show_settings)
         self.button_about = QPushButton()
         self.about_popup = AboutWindow(self)
-        self.about_popup.hide()
-        self.button_about.clicked.connect(self.show_about)
         self.button_stats = QPushButton()
         self.button_stats.setProperty("class", "highlighted")
+        self.stats_popup = UserStatsWindow(self)
         self.button_exit = QPushButton()
 
         self.menuLayout = QVBoxLayout()
         self.button_menu1 = QPushButton()
-        # self.button_menu1.setMouseTracking(True)
-        # self.button_menu1.mouse.connect(self.show_menu1)
+        self.menu1_popup = WordsetMenu(self)
         self.button_menu2 = QPushButton()
+        self.menu2_popup = ModeMenu(self)
         self.button_menu3 = QPushButton()
+        self.menu3_popup = DurationMenu(self)
         self.menuLayout.addWidget(self.button_menu1)
         self.menuLayout.addWidget(self.button_menu2)
         self.menuLayout.addWidget(self.button_menu3)
+        self.menu_list = [
+            (self.menu1_popup, self.button_menu1),
+            (self.menu2_popup, self.button_menu2),
+            (self.menu3_popup, self.button_menu3),
+            (self.settings_menu, self.button_settings),
+            (self.pause_menu, self.button_pause),
+            (self.about_popup, self.button_about),
+            (self.stats_popup, self.button_stats)
+        ]
+        for i, menu_item in enumerate(self.menu_list):
+            menu_item[0].hide()
+            # menu_item[1].clicked.connect(lambda: self.show_popup(self.menu_list[i][0]))
+        # self.button_menu3.clicked.connect(lambda: self.show_popup(self.menu3_popup))
+        self.button_menu1.clicked.connect(lambda: self.show_popup(self.menu1_popup))
+        self.button_menu2.clicked.connect(lambda: self.show_popup(self.menu2_popup))
+        self.button_menu3.clicked.connect(lambda: self.show_popup(self.menu3_popup))
+        self.button_settings.clicked.connect(lambda: self.show_popup(self.settings_menu))
+        self.button_pause.clicked.connect(lambda: self.show_popup(self.pause_menu))
+        self.button_about.clicked.connect(lambda: self.show_popup(self.about_popup))
+        self.button_stats.clicked.connect(lambda: self.show_popup(self.stats_popup))
 
         self.link_github = QLabel(
             f'<a href="{config.PROJECT_URL}" style="text-decoration:none;\
@@ -780,6 +908,7 @@ class MainWindow(QWidget):
             self.button_settings,
             self.button_stats,
             self.button_exit,
+            self.button_pause,
         ]:
             button.setCursor(QCursor(Qt.CursorShape.PointingHandCursor))
 
@@ -827,24 +956,15 @@ class MainWindow(QWidget):
             self._popframe.move(0, 0)
             self._popframe.resize(self.width(), self.height())
 
-    def show_settings(self) -> None:
-        self.show_popup(self.settings_menu)
-    
-    def show_game_stats(self) -> None:
-        self.show_popup(self.gamestats_window)
-    
-    def show_about(self) -> None:
-        self.show_popup(self.about_popup)
-    
-    def pause(self) -> None:
-        self.show_popup(self.pause_menu)
 
     def resume(self) -> None:
         pass
 
     def show_popup(self, popup: TranslucentWidget) -> None:
+        self.logger.info(f"Showing popup {popup}")
         popup.move(0, 0)
         popup.resize(self.width(), self.height())
+        # popup.initUI()
         popup.SIGNALS.CLOSE.connect(self._closepopup)
         self._popflag = True
         self.game.finish_or_pause()
@@ -948,7 +1068,7 @@ class MainWindow(QWidget):
         self.words_to_type_label.line_pos = 0
         self.update_timer.stop()
         # self.game.save()
-        self.show_game_stats()
+        self.show_popup(self.gamestats_window)
         self.words_to_type_label.label_caret.move(0, 0)
         self.init_game()
 

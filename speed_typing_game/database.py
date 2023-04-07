@@ -1,6 +1,6 @@
 import logging
 from functools import lru_cache
-from typing import Iterable, List, Tuple
+from typing import Iterable, List, Tuple, Optional
 from collections import Counter
 import time
 import datetime
@@ -342,18 +342,20 @@ def get_available_wordsets_ids() -> List[int]:
     logger.debug(f"Retrieved indices of wordsets in database: {ids}")
     return ids
 
-def get_game_data(period: Tuple[float, float] = (time.time(), (datetime.date.today().replace(day=1) - datetime.timedelta(days=1)-datetime.date(1970,1,1)).total_seconds())) -> List[Tuple[float, float, float, str]]:
+def get_game_data(
+    period: Tuple[float, float] = (time.time(), (datetime.date.today().replace(day=1) - datetime.timedelta(days=1)-datetime.date(1970,1,1)).total_seconds())
+) -> Optional[List[Tuple[float, float, float, str]]]:
     con_name = config.CON_NAME
     game_tablename = config.GAME_TABLE
     db = QSqlDatabase.database(con_name)
     if not db.open():
         logger.error(f"Could not open database connection {con_name}")
-        return False
-    # if not check_table_exists(game_tablename, con_name):
+        return None
     if not check_table_exists(game_tablename, con_name):
         logger.error(
                 f"Table {game_tablename} does not exist"
             )
+        return None
 
     queryStr = f"""
         SELECT incorrect_chars, elapsed, pos, last_updated, word_count from {game_tablename}
@@ -365,10 +367,10 @@ def get_game_data(period: Tuple[float, float] = (time.time(), (datetime.date.tod
     query.addBindValue(period[1])
     if not query.exec(queryStr):
         logger.error(
-            f"Unable to get data stats from {game_tablename} for time period {period[0].strftime()}-{period[1].strftime()}\n"
+            f"Unable to get data stats from {game_tablename} for time period {time.gmtime(period[0])}-{time.gmtime(period[1])}\n"
             + query.lastError().text()
         )
-        return [(), ()]
+        return None
     accs, wpms, dates, incorrect_charss = [], [], [], []
     while query.next():
         incorrect_chars = query.value(0)
@@ -381,4 +383,4 @@ def get_game_data(period: Tuple[float, float] = (time.time(), (datetime.date.tod
         dates.append(last_updated)
         incorrect_charss.append(incorrect_chars)
     logger.debug(f"Retrieved game data {incorrect_charss[:10]}... {accs[:10]}... {wpms[:10]}... {dates[:10]}...")
-    return zip(accs, wpms, dates, incorrect_charss)
+    return list(zip(accs, wpms, dates, incorrect_charss))

@@ -308,7 +308,7 @@ class TypingGame:
     def get_wpm(self) -> float:
         """Calculate average typing speed (WPM)."""
         if self.elapsed:
-            return self.get_word_count() / self.elapsed
+            return self.get_word_count() / self.elapsed * 60
         else:
             return 0
 

@@ -14,7 +14,7 @@ import PyQt6.QtCore as QtCore
 from PyQt6.QtGui import QIcon
 from PyQt6.QtWidgets import QApplication
 
-import speed_typing_game.config as config
+from speed_typing_game import config
 from speed_typing_game.utils import (create_connection, get_color_palette,
                                      get_color_palette_names,
                                      get_supported_locale, set_stylesheet,
