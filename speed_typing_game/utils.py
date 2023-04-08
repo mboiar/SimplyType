@@ -21,7 +21,7 @@ from functools import lru_cache
 
 from PyQt6.QtGui import QColor, QPalette
 from PyQt6.QtSql import QSqlDatabase
-from PyQt6.QtCore import QObject
+from PyQt6.QtCore import QObject, QLocale
 
 import speed_typing_game.config as config
 
@@ -151,6 +151,8 @@ def get_supported_locale() -> List[str]:
     logger.debug(f"Retrieved available locale names: {locale_names}")
     return locale_names
 
+def locale_to_language_name(locale_name: str) -> QLocale.Language:
+    return QLocale(locale_name).language()
 
 def detect_dark_theme_os() -> str:
     """Attempt to determine if user's OS theme is dark (default: dark)."""

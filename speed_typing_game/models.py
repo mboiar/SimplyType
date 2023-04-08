@@ -15,6 +15,7 @@ from functools import lru_cache
 from typing import Any, Dict, List, Optional, Tuple, Union
 
 from PyQt6.QtSql import QSqlDatabase, QSqlQuery
+from PyQt6.QtCore import QAbstractListModel
 
 from speed_typing_game import config, database
 
@@ -30,6 +31,7 @@ class Wordset:
         words: Tuple[str],
         id: Optional[int] = None,
     ) -> None:
+        super().__init__()
         self.logger = logging.getLogger(__name__)
         self.name = name
         self.language = language
@@ -151,6 +153,10 @@ class Wordset:
     def get_available_ids() -> List[int]:
         """Retrieve a list of ids of wordsets currently in database."""
         return database.get_available_wordsets_ids()
+
+
+class WordsetList(QAbstractListModel):
+    pass
 
 
 class TypingGame:

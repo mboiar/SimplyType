@@ -21,11 +21,13 @@ from PyQt6.QtWidgets import (QButtonGroup, QFileDialog, QGridLayout, QGroupBox,
                              QHBoxLayout, QLabel, QLineEdit, QListView,
                              QPushButton, QVBoxLayout, QWidget, QAbstractButton)
 from PyQt6 import QtWidgets
+from PyQt6 import QtSql
 import pyqtgraph as pg
 
-from speed_typing_game import config, models, database
+from speed_typing_game import config, models, database, utils
 from speed_typing_game.models import TypingGame
 from speed_typing_game.utils import set_stylesheet
+from speed_typing_game import main
 
 
 class MainTypingArea(QLineEdit):
@@ -33,7 +35,7 @@ class MainTypingArea(QLineEdit):
 
     def __init__(
         self,
-        label: QWidget,
+        label: "TypingHintLabel",
         allow_takeback: bool = False,
         parent: "MainWindow" = None,
         *flags,
@@ -59,26 +61,28 @@ class MainTypingArea(QLineEdit):
     def _textEdited(self, text: str) -> None:
         """Process user input during a game."""
         # char = self.words_input.text()[-1]
-        game = self.parent().game
+        game: models.TypingGame = self.parent().game
         char = text[-1]
         pos = game.pos
-        self.parent().game.pos += 1
+        game.pos += 1
         char_correct = game.text[pos]
         self.logger.debug(
             f"Typed in '{char}' - correct answer'{char_correct}'\
  - position {pos}"
         )
         self.setText("")
+        underline = False
         if char_correct == char:  # correct character typed
             color = self.palette().buttonText().color().name()
         else:  # incorrect character typed
             color = self.palette().highlight().color().name()
-            self.parent().game.incorrect_chars.update(char_correct)
+            game.incorrect_chars.update(char_correct)
             if char_correct == " ":
                 char = " "
+                underline = True
             else:
                 char = char_correct
-        new_char = self.set_html_color(char, color)
+        new_char = self.set_html_color(char, color, underline)
         # self.typed_in.append(new_char)
         self.label.formattedCharList += [new_char]
         # new_text = "".join(self.label.formattedCharList) + game.text[game.pos :]
@@ -87,22 +91,14 @@ class MainTypingArea(QLineEdit):
         ):
             self.label.newline()
         else:
-            # self.logger.debug(f"Setting new text {self.label.formattedCharList} {list(game.text[game.pos:])}")
             self.label.setCharList()
-            # if char_correct != " ":
-            #     ch = char_correct
-            # elif char == "_":
-            #     ch = char
-            # else:
-            #     ch = "_"
-            # char_width = self.label.fontMetrics().boundingRectChar(ch).width()
-            # prev_pos = self.label.label_caret.pos()
-            # self.label.label_caret.move(prev_pos.x()+char_width+1, prev_pos.y())
-        # super().textEdited(text)
 
     @staticmethod
-    def set_html_color(text: str, color: str) -> str:
-        return f'<span style="color: {color};">{text}</span>'
+    def set_html_color(text: str, color: str, underline: bool = False) -> str:
+        if underline:
+            return f'<span style="color: {color}; text-decoration: {color} underline">{text}</span>'
+        else:
+            return f'<span style="color: {color};">{text}</span>'
 
     def keyPressEvent(self, event: QKeyEvent) -> None:
         """Process and filter user input, then call default (overrided) method."""
@@ -304,6 +300,9 @@ class SettingsMenu(TranslucentWidget):
     def show(self) -> None:
         if QtCore.QSettings().value("styles/theme") == "dark":
             self.theme_switch.setChecked(True)
+        current_locale = QSettings().value("localization/locale")
+        current_language_idx = self.languages.index(utils.locale_to_language_name(current_locale))
+        self.language_box.setCurrentIndex(current_language_idx)
         super().show()
 
     def initUI(self) -> None:
@@ -314,19 +313,44 @@ class SettingsMenu(TranslucentWidget):
         self.setContentsMargins(margin_x, margin_y, margin_x, margin_y)
         self.theme_switch = Switch()
         self.theme_switch.clicked.connect(self.toggle_theme)
-
         self.theme_switch_label = QLabel()
+        
+        self.languages = [utils.locale_to_language_name(l) for l in utils.get_supported_locale()]
+        self.logger.debug(f"{self.languages}")
+        language_names = [QtCore.QLocale.languageToString(l) for l in self.languages]
+        self.language_model = QtCore.QStringListModel()
+        self.language_model.setStringList(language_names)
+        settings = QtCore.QSettings()
+        current_locale = settings.value("localization/locale")
+        self.logger.debug(f"Current locale: {current_locale}")
+        current_language_idx = self.languages.index(utils.locale_to_language_name(current_locale))
+        self.logger.debug(f"Current language: {current_language_idx}")
+        self.language_box = QtWidgets.QComboBox()
+        self.language_box.setModel(self.language_model)
+        self.language_box.setCurrentIndex(current_language_idx)
+        self.language_box.currentIndexChanged.connect(lambda idx: self.set_language(self.languages[idx]))
 
-        self.language_selector = QButtonGroup()
         self.language_selector_label = QLabel()
         for i, widgets in enumerate([
             (self.theme_switch_label, self.theme_switch),
-            # (self.language_selector_label, self.language_selector)
+            (self.language_selector_label, self.language_box)
         ]):
             self.layout().addWidget(widgets[0], i, 0)
             # self.layout().spacerItem()
             self.layout().addWidget(widgets[1], i, 1)
         self.retranslateUI()
+        
+    def set_language(self, language: QtCore.QLocale.Language) -> None:
+        # translator = QtCore.QTranslator()
+        locale = QtCore.QLocale(language)
+        # if locale == config.DEFAULT_LOCALE:
+            # QCoreApplication.removeTranslator()
+        QSettings().setValue("localization/locale", locale)
+        main.restart_app()
+        # elif translator.load(locale.name() + ".qm", config.RESOURCES_DIR + "/translate/"):
+            # QCoreApplication.instance().installTranslator(translator)
+        # else:
+            # self.logger.error(f"Could not install translator for '{locale}'")
 
     def toggle_theme(self) -> None:
         settings = QSettings("BoiarTech", config.PROJECT_NAME)
@@ -361,10 +385,13 @@ class WordsetFileSelectWindow(TranslucentWidget):
         self.wordset_list_view = QListView()
         self.wordset_from_file_button = QPushButton("Choose file containing wordset", self)
         self.wordset_from_file_button.clicked.connect(self.get_set_wordset)
+        self.error_label = QLabel()
+        self.error_label.setProperty("class", "error-text")
         self.save_to_database_checkbox = QtWidgets.QCheckBox(self)
         self.save_to_database_label = QLabel(self)
         for i, widgets in enumerate([
             (self.wordset_from_file_button, ),
+            (self.error_label, ),
             (self.save_to_database_label, self.save_to_database_checkbox)
         ]):
             for j, widget in enumerate(widgets):
@@ -409,17 +436,30 @@ class WordsetMenu(TranslucentWidget):
         super().show()
 
     def initUI(self) -> None:
-        self.setLayout(QHBoxLayout())
+        self.setLayout(QVBoxLayout())
         margin_x = self.rect().width()//2 - self.popup_width//2 + 200
         margin_y = self.rect().height()//2 - self.popup_height//2 + 200
         self.logger.debug(f"Setting margins: {margin_x} {margin_y}, w: {self.width()} h: {self.height()}")
         self.setContentsMargins(margin_x, margin_y, margin_x, margin_y)
-
-        self.wordset_list_view = QListView()
+        # self.model = models.WordsetList()
+        con_name = config.CON_NAME
+        wordset_tablename = config.WORDSET_TABLE
+        self.db = QtSql.QSqlDatabase.database(con_name)
+        if not self.db.open():
+            self.logger.error(f"Could not open database connection {con_name}")
+        self.model = QtSql.QSqlQueryModel()
+        self.model.setQuery("SELECT name, id FROM wordsets", self.db)
+        self.view = QtWidgets.QListView()
+        self.view.setModel(self.model)
+        if QSettings().contains("game/options/wordset"):
+            ix = 1 # TODO
+            self.view.selectionModel().select(ix, QtCore.QItemSelectionModel.SelectionFlags.SelectCurrent)
+        self.view.selectionModel().selectionChanged.connect(self.select_wordset_from_list)
         self.wordset_from_file_button = QPushButton("Custom")
         self.wordset_from_file_window = WordsetFileSelectWindow(self)
         self.wordset_from_file_button.clicked.connect(lambda: self.parent().show_popup(self.wordset_from_file_window))
         for _, widgets in enumerate([
+            (self.view),
             (self.wordset_from_file_button),
         ]):
             self.layout().addWidget(widgets)
@@ -442,7 +482,20 @@ class WordsetMenu(TranslucentWidget):
             if add_to_database:
                 wordset.save()
             return None
-        self.logger.error(f"Could not set wordset: wordset {wordset} has incomplete data")
+        else:
+            self.logger.error(f"Could not set wordset: wordset {wordset} has incomplete data")
+        self.close_btn.click()
+        self.parent().init_game()
+
+    def select_wordset_from_list(self) -> None:
+        ix = self.view.selectionModel().currentIndex().row()
+        wordset_id = self.model.record(ix).value("id")
+        settings = QSettings("BoiarTech", config.PROJECT_NAME)
+        settings.setValue("game/options/wordset/id", wordset_id)
+        self.logger.info(f"Set default wordset {wordset_id}")
+        self.parent().init_game()
+        self._onclose()
+
 
     def retranslateUI(self) -> None:
         pass

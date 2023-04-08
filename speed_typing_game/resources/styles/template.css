@@ -65,3 +65,9 @@ InputLabel {
     font-size: 18pt;
     font-weight: 700;
 }
+
+QComboBox {
+    border: 1px solid var(--foreground-color);
+    border-radius: 5px;
+    
+}

@@ -11,7 +11,7 @@ import os
 import sys
 
 import PyQt6.QtCore as QtCore
-from PyQt6.QtGui import QIcon
+from PyQt6.QtGui import QIcon, QGuiApplication
 from PyQt6.QtWidgets import QApplication
 
 from speed_typing_game import config
@@ -22,10 +22,9 @@ from speed_typing_game.utils import (create_connection, get_color_palette,
 from speed_typing_game.views import MainWindow
 
 
-def main() -> None:
+def configure_app(app: QApplication) -> None:
     setup_logging("console", config.LOGGING_LEVEL)
     logger = logging.getLogger(__name__)
-    app = QApplication(sys.argv)
     if not create_connection(config.DB, config.CON_NAME):
         sys.exit(1)
 
@@ -46,9 +45,9 @@ def main() -> None:
         locale = settings.value("localization/locale")
         logger.debug(f"Retrieved locale from settings: {locale}")
     else:
-        locale = "pl_PL"
+        locale = QtCore.QLocale("pl_PL")
         settings.setValue("localization/locale", locale)
-    if translator.load(locale + ".qm", config.RESOURCES_DIR + "/translate/"):
+    if locale.name() != config.DEFAULT_LOCALE and translator.load(locale.name() + ".qm", config.RESOURCES_DIR + "/translate/"):
         app.installTranslator(translator)
         logger.debug(f"Set locale: {locale}")
     else:
@@ -66,4 +65,15 @@ def main() -> None:
     # w = models.Wordset.from_file(r"speed_typing_game\resources\words\easy_polish_word_base.txt")
     window = MainWindow(icon)
     window.show()
+
+def restart_app() -> None:
+    app = QGuiApplication.instance()
+    QGuiApplication.setQuitOnLastWindowClosed(False)
+    QApplication.closeAllWindows()
+    configure_app(app)
+    QGuiApplication.setQuitOnLastWindowClosed(True)
+
+def main() -> None:
+    app = QApplication(sys.argv)
+    configure_app(app)
     sys.exit(app.exec())
