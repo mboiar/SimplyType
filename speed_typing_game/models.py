@@ -13,12 +13,17 @@ import time
 from collections import Counter
 from functools import lru_cache
 from typing import Any, Dict, List, Optional, Tuple, Union
+from enum import Enum
 
 from PyQt6.QtSql import QSqlDatabase, QSqlQuery
-from PyQt6.QtCore import QAbstractListModel
+from PyQt6.QtCore import QAbstractListModel, QSettings, QCoreApplication
 
 from speed_typing_game import config, database
 
+
+class Mode(str, Enum):
+    LEARNING = QCoreApplication.translate("Enum", "Learning")
+    CHALLENGE = QCoreApplication.translate("Enum", "Challenge")
 
 class Wordset:
     """A named set with unique words from certain language and difficulty."""
@@ -155,16 +160,12 @@ class Wordset:
         return database.get_available_wordsets_ids()
 
 
-class WordsetList(QAbstractListModel):
-    pass
-
-
 class TypingGame:
     def __init__(
         self,
         wordset_id: Optional[int] = None,
         seed: float = time.time(),
-        mode: str = "default",
+        mode: Mode = Mode.CHALLENGE,
         pos: int = 0,
         incorrect_chars: str = "",
         elapsed: float = 0,
@@ -175,28 +176,48 @@ class TypingGame:
     ) -> None:
         self.logger = logging.getLogger(__name__)
         self.seed = seed if seed else time.time()
+        wordset_name = None
+        settings = QSettings()
+        self.logger.info(f"Wordset id: {settings.value('game/options/wordset/id')}")
         if wordset_id:
             self.wordset = Wordset.from_database(wordset_id)
+        elif settings.contains("game/options/wordset/id"):
+            wordset_id = settings.value("game/options/wordset/id")
+        elif settings.contains("game/options/wordset/name"):
+            wordset_name = settings.value("game/options/wordset/name")
         else:
             ids = Wordset.get_available_ids()
             if not ids:
                 self.logger.error("Found no available wordsets in database")
                 raise
-            wordset_id = ids[1]
-            wordset = Wordset.from_database(wordset_id)
-            if wordset is not None:
-                self.wordset = wordset
-            else:
-                self.logger.error("Could not retrieve any wordset from database.")
-                return None
-            self.logger.warning(f"Using default wordset {self.wordset}")
-            self.logger.debug(Wordset.from_database.cache_info())
+            wordset_id = ids[0]
+
+        wordset = Wordset.from_database(id=wordset_id, _name=wordset_name)
+        self.logger.debug(Wordset.from_database.cache_info())
+        if wordset is not None:
+            self.wordset = wordset
+            self.logger.info(f"Using wordset {self.wordset}")
+        else:
+            self.logger.error("Could not retrieve any wordset from database.")
+            return None
         self.text = " ".join(
             self.wordset.get_subset_with_repetitions(100, self.seed)
         )
         self.pos = pos
-        self.mode = mode if mode else "default"
-        self.duration = duration if duration else 30 * 1000
+        if mode:
+            self.mode = mode
+        elif settings.contains("game/options/mode"):
+            self.mode = settings.value("game/options/mode")
+        else:
+            self.mode = Mode.CHALLENGE
+        if duration:
+            self.duration = duration*1000
+        elif settings.contains("game/options/duration"):
+            self.duration = settings.value("game/options/duration")*1000
+        else:
+            self.duration = 30*1000
+        if self.mode == Mode.LEARNING:
+            self.duration = None
         self.incorrect_chars = Counter(incorrect_chars)
         self.in_progress: bool = False
         self.start_time = created_at
@@ -293,7 +314,7 @@ class TypingGame:
 
     def finish_or_pause(self, save: bool = True) -> bool:
         """Finish game if time expired or pause otherwise."""
-        if not self.in_progress or self.is_finished():
+        if (not self.in_progress or self.is_finished()):
             self.logger.warning(
                 "Unable to pause: game not in progress or finished"
             )

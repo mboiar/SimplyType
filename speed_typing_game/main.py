@@ -32,8 +32,7 @@ def configure_app(app: QApplication) -> None:
     # system_locale = QtCore.QLocale.system().name()
     # locale = get_supported_locale()[0]
     QtCore.QCoreApplication.setApplicationName(config.PROJECT_NAME)
-    QtCore.QCoreApplication.setOrganizationName("BoiarTech")
-    QtCore.QCoreApplication.setOrganizationDomain("boiartech.com")
+    QtCore.QCoreApplication.setOrganizationName("AGHTech")
     settings = QtCore.QSettings()
     if settings.contains("styles/theme"):
         theme = settings.value("styles/theme")
