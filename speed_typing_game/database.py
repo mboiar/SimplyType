@@ -7,7 +7,7 @@ import datetime
 
 from PyQt6.QtSql import QSqlDatabase, QSqlQuery, QSqlQueryModel
 
-from speed_typing_game import config, models
+from speed_typing_game import config, models, utils
 
 logger = logging.getLogger(__name__)
 createWordsetTableQueryString = f"""
@@ -42,7 +42,7 @@ createGameTableQueryString = f"""
                 elapsed REAL,
                 created_at REAL NOT NULL UNIQUE,
                 word_count INTEGER,
-                last_updated REAL
+                last_updated REAL,
                 FOREIGN KEY (wordset_id)
                     REFERENCES {config.WORDSET_TABLE} (id)
                     ON DELETE SET NULL
@@ -92,7 +92,7 @@ def delete_game_table() -> bool:
     db = QSqlDatabase.database(con_name)
     if not db.open():
         logger.error(f"Could not open database connection '{con_name}'")
-        return False
+        utils.display_error("Database Error", f"Could not open database connection '{con_name}'")
     if True:  # not check_table_exists(wordset_tablename, con_name):
         dropTableQuery = QSqlQuery(db)
         if not dropTableQuery.exec(deleteGameTableQueryStr):
@@ -100,7 +100,8 @@ def delete_game_table() -> bool:
                 f"Unable to delete table '{game_tablename}'\n"
                 + dropTableQuery.lastError().text()
             )
-            return False
+            utils.display_error("Database Error", f"Unable to delete table '{game_tablename}'\n"
+                + dropTableQuery.lastError().text())
         logger.debug(
             f"Deleted table '{game_tablename}' from {db.databaseName()}"
         )
@@ -114,7 +115,8 @@ def delete_wordset_table() -> bool:
     db = QSqlDatabase.database(con_name)
     if not db.open():
         logger.error(f"Could not open database connection '{con_name}'")
-        return False
+        utils.display_error("Database Error", f"Could not open database connection '{con_name}'")
+
     if True:  # not check_table_exists(wordset_tablename, con_name):
         dropTableQuery = QSqlQuery(db)
         if not dropTableQuery.exec(deleteWordsetTableQueryStr):
@@ -122,13 +124,19 @@ def delete_wordset_table() -> bool:
                 f"Unable to delete table '{wordset_tablename}'\n"
                 + dropTableQuery.lastError().text()
             )
-            return False
+            utils.display_error("Database Error", f"Unable to delete table '{wordset_tablename}'\n"
+                + dropTableQuery.lastError().text()
+            )
+
         if not dropTableQuery.exec(deleteWordTableQueryStr):
             logger.error(
                 f"Unable to delete table '{word_tablename}'\n"
                 + dropTableQuery.lastError().text()
             )
-            return False
+            utils.display_error("Database Error",
+                f"Unable to delete table '{word_tablename}'\n"
+                + dropTableQuery.lastError().text())
+
         logger.debug(
             f"Deleted table '{wordset_tablename}' from {db.databaseName()}"
         )
@@ -146,7 +154,8 @@ def add_wordsets_to_database(wordsets: Iterable["models.Wordset"]) -> bool:
     db = QSqlDatabase.database(con_name)
     if not db.open():
         logger.error(f"Could not open database connection '{con_name}'")
-        return False
+        utils.display_error("Database Error", f"Could not open database connection '{con_name}'")
+
     if True:  # not check_table_exists(wordset_tablename, con_name):
         createTableQuery = QSqlQuery(db)
         if not createTableQuery.exec(createWordsetTableQueryString):
@@ -154,7 +163,9 @@ def add_wordsets_to_database(wordsets: Iterable["models.Wordset"]) -> bool:
                 f"Unable to create table '{wordset_tablename}'\n"
                 + createTableQuery.lastError().text()
             )
-            return False
+            utils.display_error("Database Error", f"Unable to create table '{wordset_tablename}'\n"
+                + createTableQuery.lastError().text())
+
         logger.debug(
             f"Created/updated table '{wordset_tablename}' in {db.databaseName()}"
         )
@@ -166,7 +177,9 @@ def add_wordsets_to_database(wordsets: Iterable["models.Wordset"]) -> bool:
                 f"Unable to create table '{word_tablename}'\n"
                 + createTableQuery.lastError().text()
             )
-            return False
+            utils.display_error("Database Error", f"Unable to create table '{word_tablename}'\n"
+                + createTableQuery.lastError().text())
+
         logger.debug(
             f"Created/updated table '{word_tablename}' in {db.databaseName()}"
         )
@@ -193,7 +206,9 @@ def add_wordsets_to_database(wordsets: Iterable["models.Wordset"]) -> bool:
                 f"Unable to insert wordset data into table '{wordset_tablename}'\n"
                 + insertWordsetQuery.lastError().text()
             )
-            return False
+            utils.display_error("Database Error", f"Unable to insert wordset data into table '{wordset_tablename}'\n"
+                + insertWordsetQuery.lastError().text())
+
         logger.info(
             f"Added wordset {name} to table {db.databaseName()}.{wordset_tablename}"
         )
@@ -206,7 +221,9 @@ def add_wordsets_to_database(wordsets: Iterable["models.Wordset"]) -> bool:
                 f"Unable to select autoincrement value for table {wordset_tablename}:\n"
                 + selectAutoincrIdQuery.lastError().text()
             )
-            return False
+            utils.display_error("Database Error", f"Unable to select autoincrement value for table {wordset_tablename}:\n"
+                + selectAutoincrIdQuery.lastError().text())
+
         selectAutoincrIdQuery.next()
         last_wordset_id = selectAutoincrIdQuery.value(0)
         last_name = selectAutoincrIdQuery.value(1)
@@ -242,7 +259,9 @@ def add_wordsets_to_database(wordsets: Iterable["models.Wordset"]) -> bool:
         logger.info(
             f"Removed wordsets from table {db.databaseName()}.{wordset_tablename}"
         )
-        return False
+        utils.display_error("Database Error", f"Unable to insert words into table '{word_tablename}'\n"
+            + insertWordQuery.lastError().text())
+
     logger.info(
         f"Added {len(word_vals)} words to table '{db.databaseName()}.{word_tablename}'"
     )
@@ -256,7 +275,8 @@ def add_games_to_database(games: Iterable["models.TypingGame"]) -> bool:
     db = QSqlDatabase.database(con_name)
     if not db.open():
         logger.error(f"Could not open database connection {con_name}")
-        return False
+        utils.display_error("Database Error", f"Could not open database connection '{con_name}'")
+
     # if not check_table_exists(game_tablename, con_name):
     if True:  # TODO
         createTableQuery = QSqlQuery(db)
@@ -265,6 +285,9 @@ def add_games_to_database(games: Iterable["models.TypingGame"]) -> bool:
                 f"Unable to create table {game_tablename}\n"
                 + createTableQuery.lastError().text()
             )
+            utils.display_error("Database Error", f"Unable to create table {game_tablename}\n"
+                + createTableQuery.lastError().text())
+
         logger.info(
             f"Created/updated table '{game_tablename}' in {db.databaseName()}"
         )
@@ -313,7 +336,9 @@ def add_games_to_database(games: Iterable["models.TypingGame"]) -> bool:
                 f"Unable to insert values into table '{game_tablename}':\n"
                 + insertGameQuery.lastError().text()
             )
-            return False
+            utils.display_error("Database Error", f"Unable to insert values into table '{game_tablename}':\n"
+                + insertGameQuery.lastError().text())
+
         logger.info(f"Added game data to database {db.databaseName()}")
     return True
 
@@ -324,18 +349,19 @@ def get_available_wordsets_ids() -> List[int]:
     db = QSqlDatabase.database(con_name)
     if not db.open():
         logger.error(f"Could not open database connection {con_name}")
-        return []
+        utils.display_error("Database Error", f"Could not open database connection '{con_name}'")
+
 
     queryString = f"""
         SELECT id FROM {wordset_tablename}
     """
     query = QSqlQuery(db)
     if not query.exec(queryString):
-        logger.error(
+        logger.warning(
             f"Unable to get wordset ids from {wordset_tablename}\n"
             + query.lastError().text()
         )
-        return []
+
     ids = []
     while query.next():
         ids.append(query.value(0))
@@ -350,9 +376,10 @@ def get_game_data(
     db = QSqlDatabase.database(con_name)
     if not db.open():
         logger.error(f"Could not open database connection {con_name}")
-        return None
+        utils.display_error("Database Error", f"Could not open database connection '{con_name}'")
+
     if not check_table_exists(game_tablename, con_name):
-        logger.error(
+        logger.warning(
                 f"Table {game_tablename} does not exist"
             )
         return None
@@ -366,11 +393,11 @@ def get_game_data(
     query.addBindValue(period[0])
     query.addBindValue(period[1])
     if not query.exec(queryStr):
-        logger.error(
+        logger.warning(
             f"Unable to get data stats from {game_tablename} for time period {time.gmtime(period[0])}-{time.gmtime(period[1])}\n"
             + query.lastError().text()
         )
-        return None
+
     accs, wpms, dates, incorrect_charss = [], [], [], []
     while query.next():
         incorrect_chars = query.value(0)

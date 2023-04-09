@@ -15,6 +15,7 @@ Functions:
 import json
 import logging
 import os
+import sys
 from datetime import datetime as dt
 from typing import Dict, List, Tuple, Union, Optional
 from functools import lru_cache
@@ -22,6 +23,7 @@ from functools import lru_cache
 from PyQt6.QtGui import QColor, QPalette
 from PyQt6.QtSql import QSqlDatabase
 from PyQt6.QtCore import QObject, QLocale
+from PyQt6.QtWidgets import QMessageBox
 
 import speed_typing_game.config as config
 
@@ -129,15 +131,28 @@ def setup_logging(log_destination: str, log_level: Union[int, str]) -> None:
         handlers=handlers,
     )
 
+def display_error(text: str, text_verbose: str, critical: bool = True) -> None:
+    msg = QMessageBox()
+    if critical:
+        icon = QMessageBox.Icon.Critical
+    else:
+        icon = QMessageBox.Icon.Warning
+    msg.setIcon(icon)
+    msg.setText(text)
+    msg.setInformativeText(text_verbose)
+    msg.setWindowTitle(text)
+    msg.exec()
+    if critical:
+        sys.exit(1)
 
 def create_connection(db_name: str, con_name: str) -> bool:
     """Create and open a SQLite database connection."""
     con = QSqlDatabase.addDatabase("QSQLITE", con_name)
     con.setDatabaseName(db_name)
-
+    logger.info(f"Trying to open database connection {db_name}")
     if not con.open():
         logger.error(f"Database Error: {con.lastError().databaseText()}")
-        return False
+        display_error("Database Error", f"Could not open database {db_name}: {con.lastError().databaseText()}")
     return True
 
 @lru_cache

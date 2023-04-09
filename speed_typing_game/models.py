@@ -18,7 +18,7 @@ from enum import Enum
 from PyQt6.QtSql import QSqlDatabase, QSqlQuery
 from PyQt6.QtCore import QAbstractListModel, QSettings, QCoreApplication
 
-from speed_typing_game import config, database
+from speed_typing_game import config, database, utils
 
 
 class Mode(str, Enum):
@@ -77,7 +77,7 @@ class Wordset:
                 name, language, difficulty = data[0].split()
                 words = data[1:]
             else:
-                logger.error("Unable to read wordset from file: empty header")
+                logger.warning("Unable to read wordset from file: empty header")
                 return None
             words = tuple(i.strip().lower() for i in set(words) if i)
             if not words:
@@ -101,7 +101,7 @@ class Wordset:
             WHERE NAME = '{_name}'
             """
         else:
-            logger.error(
+            logger.warning(
                 "Cannot retrieve wordset from database: no id or name provided"
             )
             return None
@@ -110,14 +110,14 @@ class Wordset:
         db = QSqlDatabase.database(con_name)
         if not db.open():
             logger.error(f"Could not open database connection {con_name}")
-            return None
+            utils.display_error("Database Error", f"Could not open database connection '{con_name}'")
         if not database.check_table_exists(wordset_tablename, con_name):
-            logger.error(f"Table '{wordset_tablename}' does not exist.")
+            logger.warning(f"Table '{wordset_tablename}' does not exist.")
             return None
         query = QSqlQuery(db)
         query.setForwardOnly(True)
         if not query.exec(retrieveWordsetQueryString) or not query.next():
-            logger.error(
+            logger.warning(
                 f"Unable to retrieve wordset {_name} from table {wordset_tablename}:\n"
                 + query.lastError().text()
             )
@@ -134,7 +134,7 @@ class Wordset:
             WHERE W.wordset_id = '{id}'
             """
         if not query.exec(retrieveWordQueryString):
-            logger.error(
+            logger.warning(
                 f"Unable to retrieve words from table {config.WORD_TABLE}:\n"
                 + query.lastError().text()
             )
@@ -143,7 +143,7 @@ class Wordset:
         while query.next():
             words.append(query.value(0))
         if not words:
-            logger.error(f"Received empty wordset with id {id}")
+            logger.warning(f"Received empty wordset with id {id}")
             return None
         logger.debug(
             f"Retrieved wordset with {len(words)} words from table {db.databaseName()}.{wordset_tablename}"
@@ -173,33 +173,37 @@ class TypingGame:
         id: Optional[int] = None,
         last_updated: float = 0,
         duration: int = 30 * 1000,
+        wordset: Wordset = None
     ) -> None:
         self.logger = logging.getLogger(__name__)
         self.seed = seed if seed else time.time()
         wordset_name = None
         settings = QSettings()
-        self.logger.info(f"Wordset id: {settings.value('game/options/wordset/id')}")
-        if wordset_id:
-            self.wordset = Wordset.from_database(wordset_id)
-        elif settings.contains("game/options/wordset/id"):
-            wordset_id = settings.value("game/options/wordset/id")
-        elif settings.contains("game/options/wordset/name"):
-            wordset_name = settings.value("game/options/wordset/name")
+        if wordset:
+            self.wordset = wordset
         else:
-            ids = Wordset.get_available_ids()
-            if not ids:
-                self.logger.error("Found no available wordsets in database")
-                raise
-            wordset_id = ids[0]
+            if wordset_id:
+                self.wordset = Wordset.from_database(wordset_id)
+            elif settings.contains("game/options/wordset/id"):
+                wordset_id = settings.value("game/options/wordset/id")
+            elif settings.contains("game/options/wordset/name"):
+                wordset_name = settings.value("game/options/wordset/name")
+            else:
+                ids = Wordset.get_available_ids()
+                if not ids:
+                    self.logger.error("Found no available wordsets in database")
+                    utils.display_error("Database Error", f"No available wordsets in database")
 
-        wordset = Wordset.from_database(id=wordset_id, _name=wordset_name)
-        self.logger.debug(Wordset.from_database.cache_info())
+                wordset_id = ids[0]
+            wordset = Wordset.from_database(id=wordset_id, _name=wordset_name)
+            self.logger.debug(Wordset.from_database.cache_info())
         if wordset is not None:
             self.wordset = wordset
             self.logger.info(f"Using wordset {self.wordset}")
         else:
-            self.logger.error("Could not retrieve any wordset from database.")
-            return None
+            self.logger.error("No wordset provided.")
+            utils.display_error("Value Error", "No wordset provided.")
+
         self.text = " ".join(
             self.wordset.get_subset_with_repetitions(100, self.seed)
         )
@@ -251,7 +255,7 @@ class TypingGame:
             WHERE created_at = '{created_at}'
             """
         else:
-            logger.error(
+            logger.warning(
                 "Cannot retrieve game from database: no id or created_at provided"
             )
             return None
@@ -260,7 +264,7 @@ class TypingGame:
         db = QSqlDatabase.database(con_name)
         if not db.open():
             logger.error(f"Could not open database connection {con_name}")
-            return None
+            utils.display_error("Database Error", f"Could not open database connection '{con_name}'")
         if not database.check_table_exists(game_tablename, con_name):
             logger.error("Game table does not exist.")
             return None
@@ -389,7 +393,7 @@ class TypingGame:
         db = QSqlDatabase.database(con_name)
         if not db.open():
             self.logger.error(f"Could not open database connection {con_name}")
-            return None
+            utils.display_error("Database Error", f"Could not open database connection '{con_name}'")
         if not database.check_table_exists(game_tablename, con_name):
             self.logger.error("Game table does not exist.")
             return None
@@ -436,7 +440,9 @@ class TypingGame:
                 f"Unable to update game {self.id} in table {game_tablename}:\n"
                 + query.lastError().text()
             )
-            return False
+            utils.display_error("Database Error", f"Unable to update game {self.id} in table {game_tablename}:\n"
+                + query.lastError().text())
+
 
         self.logger.debug(
             f"Updated game {self.id} in table {db.databaseName()}.{game_tablename}"
