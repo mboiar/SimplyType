@@ -11,6 +11,7 @@ import logging
 import sys
 from typing import Dict, List, Tuple, Optional
 from collections import Counter
+import time
 
 import PyQt6.QtCore as QtCore
 import PyQt6.QtGui as QtGui
@@ -144,9 +145,8 @@ class PopupWidget(QWidget):
         self.setWindowFlags(QtCore.Qt.WindowFlags.Popup | QtCore.Qt.WindowFlags.FramelessWindowHint)
         # self.setAttribute(QtCore.Qt.WidgetAttribute.WA_TranslucentBackground)
 
-        self.sizePolicy().setHorizontalPolicy(QtWidgets.QSizePolicy.Policy.Minimum)
-        self.sizePolicy().setVerticalPolicy(QtWidgets.QSizePolicy.Policy.Minimum)
-        self.logger.debug(f"Set fixed size: {self.parent().width()*0.5}, {self.parent().height()*0.6}")
+        # self.sizePolicy().setHorizontalPolicy(QtWidgets.QSizePolicy.Policy.Minimum)
+        # self.sizePolicy().setVerticalPolicy(QtWidgets.QSizePolicy.Policy.Minimum)
         self.fillColor = self.palette().window().color().darker(120) #QtGui.QColor(30, 30, 30, 120)  # TODO
         self.penColor = self.palette().windowText().color().darker(120) #QtGui.QColor("#333333")  # TODO
         self.setContentsMargins(20, 20, 20, 20)
@@ -160,11 +160,15 @@ class PopupWidget(QWidget):
         self.close_btn.setFixedSize(30, 30)
         self.close_btn.clicked.connect(self._onclose)
         self.SIGNALS = TranslucentWidgetSignals()
+        self.setStyleSheet(f"""
+                                        border: 1px solid {self.palette().text().color().name()};
+                                        border-radius: 5px;
+                                        """)
 
     def resizeEvent(self, event: QResizeEvent) -> None:
         p_g: QtCore.QRect = self.parent().geometry()
-        self.resize(p_g.width()*0.5, p_g.height()*0.6)
-
+        self.resize(p_g.width()*0.8, p_g.height()*0.9)
+        self.adjustSize()
         s_g = self.geometry()
         self.logger.debug(f"Set position: {p_g.x()+p_g.width()*0.5-s_g.width()*0.5}, {p_g.y()+p_g.height()*0.5-s_g.width()*0.5}")
         self.move(p_g.x()+p_g.width()*0.5-s_g.width()*0.5, p_g.y()+p_g.height()*0.5-s_g.width()*0.5)
@@ -276,7 +280,8 @@ class SettingsMenu(PopupWidget):
 
     def initUI(self) -> None:
         self.setLayout(QGridLayout())
-
+        self.layout().setVerticalSpacing(30)
+        self.layout().setHorizontalSpacing(50)
         self.theme_switch = Switch()
         self.theme_switch.clicked.connect(self.toggle_theme)
         self.theme_switch_label = QLabel()
@@ -326,6 +331,7 @@ class SettingsMenu(PopupWidget):
         set_stylesheet(
             QCoreApplication.instance(), theme
         )
+        self.parent().repaint()
         QtCore.QSettings().setValue("styles/theme", theme)
 
     def retranslateUI(self) -> None:
@@ -345,7 +351,6 @@ class WordsetFileSelectWindow(PopupWidget):
     def initUI(self) -> None:
         self.setLayout(QGridLayout())
 
-        self.wordset_list_view = QListView()
         self.wordset_from_file_button = QPushButton("Choose file containing wordset", self)
         self.wordset_from_file_button.clicked.connect(self.get_set_wordset)
         self.wordset_from_file_button.setCursor(QCursor(Qt.CursorShape.PointingHandCursor))
@@ -413,7 +418,8 @@ class WordsetMenu(PopupWidget):
         self.model = QtSql.QSqlQueryModel()
         self.model.setQuery("SELECT name, id FROM wordsets", self.db)
         self.view = QtWidgets.QListView()
-        self.view.setItemAlignment(Qt.Alignment.AlignVCenter)
+        self.view.setItemAlignment(Qt.Alignment.AlignVCenter | Qt.Alignment.AlignHCenter)
+
         self.view.setModel(self.model)
         # if QSettings().contains("game/options/wordset"):
         #     ix = 1 # TODO
@@ -529,8 +535,6 @@ class UserStatsWindow(PopupWidget):
             (self.title)
         ]):
             self.layout().addWidget(widgets, i, 0)
-            # self.layout().spacerItem()
-            # self.layout().addWidget(widgets[1], i, 1)
         self.retranslateUI()
 
     def get_game_data(self) -> Optional[List[Tuple[float, float, float, str]]]:
@@ -570,8 +574,6 @@ class GameStatsWindow(PopupWidget):
         self.button_continue.clicked.connect(self.close_btn.click)
         self.button_continue.setCursor(QCursor(Qt.CursorShape.PointingHandCursor))
 
-        # self.theme_switch.clicked.connect(self.set_mode)
-        # self.duration_selector_label = QLabel()
         for i, widgets in enumerate([
             (self.title,),
             (self.wpm_label, self.wpm_data),
@@ -623,8 +625,6 @@ class PauseMenu(PopupWidget):
             self.exit_button
         ]):
             self.layout().addWidget(widget)
-            # self.layout().spacerItem()
-            # self.layout().addWidget(widgets[1], i, 1)
         self.retranslateUI()
 
     def retranslateUI(self) -> None:
@@ -659,12 +659,10 @@ class DurationMenu(PopupWidget):
         current_duration = settings.value("game/options/duration")
         self.logger.debug(f"Current duration: {current_duration}")
         self.duration_view = QtWidgets.QListView()
+        self.duration_view.setItemAlignment(Qt.Alignment.AlignVCenter | Qt.Alignment.AlignHCenter)
+
         self.duration_view.setModel(self.duration_model)
         self.duration_view.selectionModel().selectionChanged.connect(lambda ix: self.set_duration(self.duration_list[ix.indexes()[0].row()]))
-        # if current_duration:
-            # current_duration_idx = self.duration_list.index(current_duration)
-            # self.duration_view.selectionModel().select(self.duration_view.find(), QtCore.QItemSelectionModel.SelectionFlags.SelectCurrent)
-
         for _, widgets in enumerate([
             (self.duration_view),
         ]):
@@ -680,9 +678,6 @@ class DurationMenu(PopupWidget):
 
     def retranslateUI(self) -> None:
         pass
-        # self.duration_selector_label.setText(
-        #     QCoreApplication.translate("QLabel", "Select duration")
-        # )
 
 
 class ModeMenu(PopupWidget):
@@ -699,12 +694,10 @@ class ModeMenu(PopupWidget):
         current_mode = settings.value("game/options/mode")
         self.logger.debug(f"Current duration: {current_mode}")
         self.mode_view = QtWidgets.QListView()
+        self.mode_view.setItemAlignment(Qt.Alignment.AlignVCenter | Qt.Alignment.AlignHCenter)
+
         self.mode_view.setModel(self.mode_model)
         self.mode_view.selectionModel().selectionChanged.connect(lambda ix: self.set_mode(ix.indexes()[0].row()))
-        # if current_duration:
-            # current_duration_idx = self.duration_list.index(current_duration)
-            # self.duration_view.selectionModel().select(self.duration_view.find(), QtCore.QItemSelectionModel.SelectionFlags.SelectCurrent)
-
         for _, widgets in enumerate([
             (self.mode_view),
         ]):
@@ -720,9 +713,6 @@ class ModeMenu(PopupWidget):
 
     def retranslateUI(self) -> None:
         pass
-        # self.duration_selector_label.setText(
-        #     QCoreApplication.translate("QLabel", "Select duration")
-        # )
 
 
 class TypingHintLabel(QLabel):
@@ -824,14 +814,21 @@ class MainWindow(QWidget):
     def __init__(self, icon: QIcon) -> None:
         super().__init__()
         self.logger = logging.getLogger(__name__)
+        # self.timer = QtCore.QTimer()
         self.timer = QtCore.QTimer()
+        self.timer.setSingleShot(True)
+        self.timer.timeout.connect(self.finish_game)
+        self.update_timer = QtCore.QTimer()
+        self.update_timer.timeout.connect(self.update_timer_label)
         self.icon = icon
+        self.timer_id = 0
         self.settings = QSettings()
         self.game = TypingGame(
             wordset_id=self.settings.value("game/options/wordset/id"),
             duration=self.settings.value("game/options/duration"),
             mode=self.settings.value("game/options/mode")
         )
+        self.remaining_time = self.game.duration
         self.init_window()
 
     def init_window(self) -> None:
@@ -868,10 +865,19 @@ class MainWindow(QWidget):
         self.sidebarLayout = QVBoxLayout()
         self.button_settings = QPushButton()
         self.settings_menu = SettingsMenu(self)
-        pixmapi = QtWidgets.QStyle.StandardPixmap.SP_MediaPlay
-        icon = self.style().standardIcon(pixmapi)
+        pixmapi = QtWidgets.QStyle.StandardPixmap.SP_MediaPause
+        # mask = pixmapi.createMaskFromColor(QtGui.QColor('blue'), Qt.MaskMode.MaskOutColor)
+        # pixmapi.setMask(mask)
+        option = QtWidgets.QStyleOption()
+        option.palette = self.palette()
+        icon = self.style().standardIcon(pixmapi, option)
         self.button_pause = QPushButton(self)
-        self.button_pause.setIcon(QtGui.QIcon.fromTheme("media-playback-pause"))
+        # self.button_pause.setIcon(icon)
+        # self.button_pause.setStyleSheet(f"""
+                                        # border: 1px solid {self.palette().text().color().name()};
+                                        # border-radius: 40px;
+                                        # color: {self.palette().text().color().name()};
+                                        # """)
         self.button_pause.setText("PAUSE")
         self.pause_menu = PauseMenu(self)
         self.gamestats_window = GameStatsWindow(self)
@@ -939,16 +945,13 @@ class MainWindow(QWidget):
         self.mainLayout.setContentsMargins(20, 20, 20, 20)
         self.mainLayout.setVerticalSpacing(20)
         self.mainLayout.addWidget(self.title, 0, 0, Qt.Alignment.AlignLeft)
-        # self.mainLayout.setColumnMinimumWidth(0, self.width()*0.2)
-        # self.mainLayout.setColumnMinimumWidth(1, self.width()*0.2)
-        # self.mainLayout.setColumnMinimumWidth(2, self.width()*0.2)
-        self.mainLayout.setRowMinimumHeight(1, 50)
+
+        self.mainLayout.setRowMinimumHeight(1, 100)
 
         self.mainLayout.addWidget(self.button_pause, 0, 2, Qt.Alignment.AlignRight)
         self.mainLayout.addWidget(self.timer_label, 1, 0)
-        self.timer_label.hide()
+        # self.timer_label.hide()
         self.mainLayout.addWidget(self.words_input, 1, 1)
-        # self.mainLayout.addWidget(self.input_label)
         self.mainLayout.addWidget(self.words_to_type_label, 2, 0, 1, 3)
         self.mainLayout.addWidget(self.button_reset, 3, 1)
         self.mainLayout.addWidget(self.description_label, 4, 1)
@@ -967,17 +970,9 @@ class MainWindow(QWidget):
         self.button_reset.clicked.connect(self.reset_game)
         self.button_exit.clicked.connect(self.close)
         self.words_to_type_label.mousePressEvent = self.set_focus
-        # self.mainLayout.addWidget(self.settings_menu)
-        # self._settings_popup = QPushButton("Gimme settings")
-        # self.tr = TranslucentWidget(self)
-        self._popframe = None
+        self._popframes: List[PopupWidget] = []
         self._popflag = False
-        # self.layout().addWidget(self.button_pause)
-        # self.button_pause.move(self.geometry().x()+self.geometry().width()-self.button_pause.width() - 30, self.geometry().y()+30)
 
-
-        # self.button_pause.move(self.geometry().x()+self.geometry().width()-30, self.geometry().y()+30)
-        self.button_pause.show()
         self.retranslate()
 
     @staticmethod
@@ -988,47 +983,60 @@ class MainWindow(QWidget):
         self.words_input.setFocus()
 
     def resizeEvent(self, event):
-        # if self._popflag:
-            # self._popframe.move()
-            # self._popframe.resize(self.width(), self.height())
-        f_g = self.geometry()
         self.words_to_type_label.resizeEvent(event)
-        # self.logger.debug(f"{f_g.x()+f_g.width()-self.button_pause.width() - 30}, {f_g.y()+30}")
-        # self.button_pause.move(f_g.x()+f_g.width()-self.button_pause.width() - 150, f_g.y()-40)
-        # self.button_pause.show()
-
-    def resume(self) -> None:
-        pass
 
     def show_popup(self, popup: PopupWidget) -> None:
         self.logger.info(f"Showing popup {popup}")
         popup.move(0, 0)
         popup.resize(self.width(), self.height())
-        # popup.initUI()
         popup.SIGNALS.CLOSE.connect(self._closepopup)
+        # if not self._popflag:
+            
         self._popflag = True
-        self.game.finish_or_pause()
-        # self.timer.pause() # TODO
+        self.pause_timer(reset=True)
         popup.show()
-        self._popframe = popup
-        # self._popframe.move(0, 0)
-        # self._popframe.resize(self.width(), self.height())
-        # self._popframe.SIGNALS.CLOSE.connect(self._closepopup)
-        # self._popflag = True
-        # self.game.finish_or_pause()
-        # self._popframe.show()
+        self._popframes.append(popup)
 
     def _closepopup(self) -> None:
-        popup = self._popframe
+        if not self._popframes:
+            return None
+        popup = self._popframes.pop()
+        self.logger.info(f"Closing popup {popup}")
+
         popup.close()
         self._popflag = False
-        # self.activateWindow()
         self.set_focus()
+        self.pause_timer()
 
     def reset_game(self) -> None:
         self.logger.debug("Reset game")
-        self.finish_game(save=False)
-        # self.init_game()
+        self.remaining_time = 0
+        self.game.finish_or_pause(save=False)
+        self.words_to_type_label.formattedCharList.clear()
+        self.words_to_type_label.line_pos = 0
+        self.words_to_type_label.min_char_pos = 0
+        # self.words_to_type_label.setCharList()
+        if self.game.duration != -1:
+            if self.update_timer.isActive():
+                self.update_timer.stop()
+            if self.timer.isActive():
+                self.timer.stop()
+        self.init_game()
+
+        for button in [
+            self.button_about,
+            self.button_menu1,
+            self.button_menu2,
+            self.button_menu3,
+            # self.button_reset,
+            self.button_settings,
+            self.button_stats,
+            # self.button_exit,
+        ]:
+            button.show()
+        self.timer_label.setText("")
+
+        self.description_label.show()
         self.set_focus()
 
     def retranslate(self) -> None:
@@ -1090,6 +1098,7 @@ class MainWindow(QWidget):
         self.words_to_type_label.min_char_pos = self.game.pos
         self.logger.debug(f"Setting starting label position {self.game.pos}")
         self.words_to_type_label.setCharList()
+        self.remaining_time = self.game.duration
         self.set_focus()
 
     def start_game(self) -> None:
@@ -1102,39 +1111,48 @@ class MainWindow(QWidget):
         ]:
             button.hide()
         self.description_label.hide()
-        self.timer_label.show()
+        # self.timer_label.show()
 
-        if self.game.mode == models.Mode.CHALLENGE or self.game.duration == -1:
-            self.timer = QtCore.QTimer()
-            self.timer.setSingleShot(True)
-            self.timer.timeout.connect(self.finish_game)
+        if self.game.duration != -1:
             self.logger.debug(f"Setting timer for {self.game.duration//1000} s")
             self.timer.start(self.game.duration)
-            self.update_timer = QtCore.QTimer()
-            self.update_timer.timeout.connect(self.update_timer_label)
             self.update_timer.start(100)
         else:
-            pass
-            # self.timer_label.setText(QCoreApplication.translate("No timer"))
+            # pass
+            self.timer_label.setText("")
 
         self.game.start_or_resume()
 
     def display_results(self) -> None:
         self.logger.info(f"Finished game {self.game.get_stats()}")
 
-    def finish_game(self, save: bool = False) -> None:
-        self.logger.debug("Trying to finish game?")
+    def pause_timer(self, reset: bool = None) -> None:
+        if self.game.duration != -1:
+            self.logger.debug(f"Timer active: {self.timer.isActive()}; popup open: {self._popflag}; game in progress: {self.game.in_progress}")
+            if self.timer.isActive() and self.game.in_progress:
+                self.game.finish_or_pause()
+                self.remaining_time = self.timer.remainingTime()
+                self.logger.debug(f"Pause: {self.remaining_time/1000:.3f}/{self.game.duration//1000} s")
+                self.update_timer.stop()
+                self.timer.stop()
+            elif self._popflag == False and not self.game.in_progress and self.game.elapsed > 0:
+                self.game.start_or_resume()
+                self.logger.debug(f"Resume: {self.remaining_time/1000:.3f}/{self.game.duration//1000} s")
+
+                self.timer.start(self.remaining_time)
+                self.update_timer.start()
+
+    def finish_game(self, save: bool = True) -> None:
+        self.remaining_time = 0
         if not self.game.finish_or_pause(save=save):
             return None
         self.words_to_type_label.formattedCharList.clear()
         self.words_to_type_label.line_pos = 0
         self.words_to_type_label.min_char_pos = 0
         # self.words_to_type_label.setCharList()
-        if self.game.mode == models.Mode.CHALLENGE or self.game.duration == -1:
+        if self.game.duration != -1 and self.update_timer.isActive():
             self.update_timer.stop()
-        # self.game.save()
         self.show_popup(self.gamestats_window)
-        self.words_to_type_label.label_caret.move(0, 0)
         self.init_game()
 
         for button in [
@@ -1148,12 +1166,33 @@ class MainWindow(QWidget):
             # self.button_exit,
         ]:
             button.show()
-        self.timer_label.hide()
+        # self.timer_label.hide()
+        self.timer_label.setText("")
+
         self.description_label.show()
         self.set_focus()
 
     def update_timer_label(self) -> None:
         self.timer_label.setText(str(int(self.timer.remainingTime() // 1000)))
+
+    def repaint(self) -> None:
+        super().repaint()
+        self.title.setText(
+            f"<font color='{self.palette().brightText().color().name()}'>Simply</font>Type"
+        )
+        # self.button_pause.setStyleSheet(f"""
+        #     border: 1px solid {self.palette().text().color().name()};
+        #     border-radius: 40px;
+        #     color: {self.palette().text().color().name()};
+        # """)
+        self.button_stats.setProperty("class", "highlighted")
+        self.button_stats.setText(QCoreApplication.translate("QPushButton", "Stats"))
+        self.link_github.setText(
+            f'<a href="{config.PROJECT_URL}" style="text-decoration:none;\
+            color:{self.palette().text().color().name()}">{config.PROJECT_VERSION}</a>'
+        )
+        self.words_to_type_label.setCharList()
+        
 
     def close(self) -> None:
         sys.exit()

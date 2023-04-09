@@ -69,15 +69,16 @@ InputLabel {
 QComboBox {
     border: 1px solid var(--foreground-color);
     border-radius: 5px;
-    box-shadow: none;
 }
 
-PopupWidget {
+/* PopupWidget {
     border: 1px solid var(--foreground-selected-color);
     border-radius: 5px;
-}
+} */
 
 QListView {
     border: none;
+    align-items: center;
+    align-content: center;
     text-align: center;
 }

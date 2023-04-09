@@ -231,10 +231,10 @@ class TypingGame:
         self.logger.info(f"Initializing {self}")
 
     def __str__(self) -> str:
-        return f"TypingGame: wordset {self.wordset}, seed {self.seed}, mode {self.mode}, elapsed: {self.elapsed} out of {self.duration} ms"
+        return f"TypingGame: wordset {self.wordset}, seed {self.seed}, mode {self.mode}, elapsed: {self.elapsed:.2f} out of {self.duration/1000:.2f} s"
 
     def __repr__(self) -> str:
-        return f"TypingGame: wordset {self.wordset}, seed {self.seed}, mode {self.mode}, elapsed: {self.elapsed} out of {self.duration} ms"
+        return f"TypingGame: wordset {self.wordset}, seed {self.seed}, mode {self.mode}, elapsed: {self.elapsed:.2f} out of {self.duration/1000:.2f} s"
 
     @classmethod
     def from_database(
@@ -316,7 +316,7 @@ class TypingGame:
         self.logger.info(f"Started/resumed game {self}")
         return True
 
-    def finish_or_pause(self, save: bool = True) -> bool:
+    def finish_or_pause(self, save: bool = False) -> bool:
         """Finish game if time expired or pause otherwise."""
         if (not self.in_progress or self.is_finished()):
             self.logger.warning(
