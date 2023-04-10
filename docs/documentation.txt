@@ -14,8 +14,8 @@ Dodano rejestrację przebiegu działania programu (logging) i zaimplementowano r
 
 23.03.2023 - Filip Chałupka - Dodanie koncepcji ekranu ustawień gry i przykładowe przejścia pomiędzy interfejsami.
 
-24.03.2023 - Maksym Boiar - Refaktoryzacja kodu
-
 28.03.2023 - Mateusz Basiura - Dodanie zbiorów słów i wyrazów
 
-28.04.2023 - Maksym Boiar - Interakcja z bazą danych i okna wyskakujące
+28.03.2023 - Maksym Boiar - Interakcja z bazą danych
+
+10.04.2023 - Maksym Boiar - Ustawienia, Tryby gry, Zapisywanie stanu gry, zbudowanie aplikacji dla Windows (.exe)
