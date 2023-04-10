@@ -143,13 +143,11 @@ class PopupWidget(QWidget):
 
         self.logger = logging.getLogger(__name__)
         self.setWindowFlags(QtCore.Qt.WindowFlags.Popup | QtCore.Qt.WindowFlags.FramelessWindowHint)
-        # self.setAttribute(QtCore.Qt.WidgetAttribute.WA_TranslucentBackground)
 
-        # self.sizePolicy().setHorizontalPolicy(QtWidgets.QSizePolicy.Policy.Minimum)
+        self.sizePolicy().setHorizontalPolicy(QtWidgets.QSizePolicy.Policy.Minimum)
         # self.sizePolicy().setVerticalPolicy(QtWidgets.QSizePolicy.Policy.Minimum)
-        self.fillColor = self.palette().window().color().darker(120) #QtGui.QColor(30, 30, 30, 120)  # TODO
-        self.penColor = self.palette().windowText().color().darker(120) #QtGui.QColor("#333333")  # TODO
-        self.setContentsMargins(20, 20, 20, 20)
+
+        self.setContentsMargins(40, 20, 40, 40)
         self.close_btn = QPushButton(self)
         self.close_btn.setText("x")
         self.close_btn.setCursor(QCursor(Qt.CursorShape.PointingHandCursor))
@@ -160,20 +158,13 @@ class PopupWidget(QWidget):
         self.close_btn.setFixedSize(30, 30)
         self.close_btn.clicked.connect(self._onclose)
         self.SIGNALS = TranslucentWidgetSignals()
-        self.setStyleSheet(f"""
-                                        border: 1px solid {self.palette().text().color().name()};
-                                        border-radius: 5px;
-                                        """)
 
     def resizeEvent(self, event: QResizeEvent) -> None:
         p_g: QtCore.QRect = self.parent().geometry()
-        self.resize(p_g.width()*0.8, p_g.height()*0.9)
-        self.adjustSize()
         s_g = self.geometry()
-        self.logger.debug(f"Set position: {p_g.x()+p_g.width()*0.5-s_g.width()*0.5}, {p_g.y()+p_g.height()*0.5-s_g.width()*0.5}")
-        self.move(p_g.x()+p_g.width()*0.5-s_g.width()*0.5, p_g.y()+p_g.height()*0.5-s_g.width()*0.5)
+        self.move(p_g.x()+p_g.width()*0.5-s_g.width()*0.5, p_g.y()+p_g.height()*0.5-s_g.height()*0.5)
 
-        ow = int(s_g.x() + s_g.width())
+        ow = int(s_g.x() + s_g.width()-self.close_btn.width()-15)
         oh = int(s_g.y())
         self.close_btn.move(ow, oh)
 
@@ -183,6 +174,20 @@ class PopupWidget(QWidget):
         
     def closeEvent(self, a0: QtGui.QCloseEvent) -> None:
         self._onclose()
+        
+    def show(self) -> None:
+        self.fillColor = self.palette().window().color().lighter(120)
+        self.penColor = self.palette().windowText().color().darker(120)
+        self.setStyleSheet(f"""PopupWidget {{
+                                        border: 4px solid {self.palette().text().color().name()};
+                                        border-radius: 5px;
+                                        background: {self.fillColor.name()};
+                                        color: {self.penColor.name()}
+        }}
+        QWidget {{
+            background: {self.fillColor.name()}
+        }}""")
+        return super().show()
 
 
 class SwitchPrivate(QtCore.QObject):
@@ -276,6 +281,7 @@ class SettingsMenu(PopupWidget):
         current_locale = QSettings().value("localization/locale")
         current_language_idx = self.languages.index(utils.locale_to_language_name(current_locale))
         self.language_box.setCurrentIndex(current_language_idx)
+        self.adjustSize()
         super().show()
 
     def initUI(self) -> None:
@@ -359,16 +365,25 @@ class WordsetFileSelectWindow(PopupWidget):
         self.error_label.setProperty("class", "error-text")
         self.save_to_database_checkbox = QtWidgets.QCheckBox(self)
         self.save_to_database_label = QLabel(self)
-        for i, widgets in enumerate([
-            (self.wordset_from_file_button, ),
-            (self.error_label, ),
-            (self.save_to_database_label, self.save_to_database_checkbox)
-        ]):
-            for j, widget in enumerate(widgets):
-                self.layout().addWidget(widget, i, j)
-            # self.layout().spacerItem()
-            # self.layout().addWidget(widgets[1], i, 1)
+        self.layout().addWidget(self.wordset_from_file_button, 0, 0, 1, 3, Qt.Alignment.AlignCenter)
+        self.layout().addWidget(self.error_label, 1, 0, 1, 3)
+        self.layout().addWidget(self.save_to_database_label, 2, 0, 1, 2)
+        self.layout().addWidget(self.save_to_database_checkbox, 2, 2, 1, 1)
+        self.layout().setSpacing(20)
+
+        self.wordset_from_file_button.setMaximumSize(200, 20)
+        self.error_label.setMaximumSize(200, 20)
+        self.save_to_database_label.setMaximumSize(150, 20)
         self.retranslateUI()
+        
+    def resizeEvent(self, event: QResizeEvent) -> None:
+        # self.setFixedSize(200,300)
+        # self.adjustSize()
+        return super().resizeEvent(event)
+
+    def show(self) -> None:
+        self.adjustSize()
+        return super().show()
 
     def get_wordset_filename_from_user_input(self) -> Optional[str]:
         file_name, selected_filter = QFileDialog.getOpenFileName(
@@ -404,6 +419,7 @@ class WordsetMenu(PopupWidget):
         self.initUI()
         
     def show(self) -> None:
+        self.adjustSize()
         super().show()
 
     def initUI(self) -> None:
@@ -419,17 +435,20 @@ class WordsetMenu(PopupWidget):
         self.model.setQuery("SELECT name, id FROM wordsets", self.db)
         self.view = QtWidgets.QListView()
         self.view.setItemAlignment(Qt.Alignment.AlignVCenter | Qt.Alignment.AlignHCenter)
-
         self.view.setModel(self.model)
+        self.view.setMaximumWidth(150)
+        self.view.setMaximumHeight(self.parent().height()*0.5)
         # if QSettings().contains("game/options/wordset"):
         #     ix = 1 # TODO
         #     self.view.selectionModel().select(ix, QtCore.QItemSelectionModel.SelectionFlags.SelectCurrent)
         self.view.selectionModel().selectionChanged.connect(self.select_wordset_from_list)
         self.wordset_from_file_button = QPushButton("Custom")
         self.wordset_from_file_button.setCursor(QCursor(Qt.CursorShape.PointingHandCursor))
-        self.view.setMaximumWidth(300)
-        self.view.setMaximumHeight(self.parent().geometry().height()*0.5)
-        self.view.setSizePolicy(QtWidgets.QSizePolicy.Policy.Minimum, QtWidgets.QSizePolicy.Policy.Minimum)
+        self.wordset_from_file_button.setMaximumWidth(100)
+        self.layout().setSpacing(5)
+        # self.view.setMaximumWidth(300)
+        # self.view.setMaximumHeight(self.parent().geometry().height()*0.5)
+        # self.view.setSizePolicy(QtWidgets.QSizePolicy.Policy.Minimum, QtWidgets.QSizePolicy.Policy.Minimum)
         self.wordset_from_file_window = WordsetFileSelectWindow(self.parent())
         self.wordset_from_file_button.clicked.connect(lambda: self.parent().show_popup(self.wordset_from_file_window))
         for _, widgets in enumerate([
@@ -437,8 +456,10 @@ class WordsetMenu(PopupWidget):
             (self.wordset_from_file_button),
         ]):
             self.layout().addWidget(widgets)
+            # self.layout().setAlignment(widgets, Qt.Alignment.AlignJustify)
             # self.layout().spacerItem()
             # self.layout().addWidget(widgets[1], i, 1)
+        self.view.adjustSize()
         self.retranslateUI()
 
     def set_wordset(self, wordset: models.Wordset, add_to_database: bool = False) -> None:
@@ -489,10 +510,17 @@ class AboutWindow(PopupWidget):
         for i, widgets in enumerate([
             (self.about_label),
         ]):
-            self.layout().addWidget(widgets, i, 0)
+            self.layout().addWidget(widgets, i, 0, 1, 1, Qt.Alignment.AlignCenter)
             # self.layout().spacerItem()
             # self.layout().addWidget(widgets[1], i, 1)
+        self.about_label.setMaximumSize(200, 20)
         self.retranslateUI()
+
+    def show(self) -> None:
+        # self.setFixedSize(200,300)
+        self.adjustSize()
+        super().show()
+        # return super().resizeEvent(event)
 
     def retranslateUI(self) -> None:
         self.about_label.setText(
@@ -524,17 +552,28 @@ class UserStatsWindow(PopupWidget):
             self.most_inaccurate_letters = counter.most_common(10)
             self.avg_stats = [sum(i)/len(i) for i in [accs, wpms]]
         # TODO
+        if self.avg_stats:
+            self.acc_data.setText(f"{self.avg_stats[0]:.2f}%")
+            self.wpm_data.setText(f"{self.avg_stats[1]:.2f} wpm")
+        self.adjustSize()
         super().show()        
 
     def initUI(self) -> None:
         self.setLayout(QGridLayout())
         self.title = QLabel()
         self.title.setProperty("class", "heading")
-
+        self.acc_label = QLabel(QCoreApplication.translate("QLabel", "Average accuracy"))
+        self.wpm_label = QLabel(QCoreApplication.translate("QLabel", "Average speed"))
+        self.acc_data = QLabel()
+        self.wpm_data = QLabel()
         for i, widgets in enumerate([
-            (self.title)
+            (self.title, ),
+            (self.acc_label, self.acc_data),
+            (self.wpm_label, self.wpm_data)
         ]):
-            self.layout().addWidget(widgets, i, 0)
+            for j, widget in enumerate(widgets):
+                widget.setMaximumSize(200, 20)
+                self.layout().addWidget(widget, i, j, Qt.Alignment.AlignCenter)
         self.retranslateUI()
 
     def get_game_data(self) -> Optional[List[Tuple[float, float, float, str]]]:
@@ -558,6 +597,7 @@ class GameStatsWindow(PopupWidget):
             self.accuracy_data.setText(f"{stats['accuracy']*100:.0f}%")
             most_frequent = sorted(stats["incorrect characters frequency"], key=lambda x: x[1])[:5]
             self.incorrect_chars_data.setText(" ".join([f"'{i[0]}' ({i[1]})" for i in most_frequent]))
+        self.adjustSize()
         super().show()
 
     def initUI(self) -> None:
@@ -582,7 +622,8 @@ class GameStatsWindow(PopupWidget):
             (self.button_continue,)
         ]):
             for j, widget in enumerate(widgets):
-                self.layout().addWidget(widget, i, j)
+                self.layout().addWidget(widget, i, j, Qt.Alignment.AlignCenter)
+                widget.setMaximumSize(200, 20)
         self.retranslateUI()
 
     def retranslateUI(self) -> None:
@@ -625,6 +666,11 @@ class PauseMenu(PopupWidget):
             self.exit_button
         ]):
             self.layout().addWidget(widget)
+            widget.setMaximumWidth(100)
+            widget.setMaximumHeight(20)
+            # self.layout().setAlignment(widget, Qt.Alignment.AlignCenter)
+        self.layout().setSpacing(0)
+        self.setFixedSize(200,300)
         self.retranslateUI()
 
     def retranslateUI(self) -> None:
@@ -641,6 +687,9 @@ class PauseMenu(PopupWidget):
             QCoreApplication.translate("QLabel", "Exit")
         )
 
+    def show(self) -> None:
+        self.adjustSize()
+        return super().show()
 
 class DurationMenu(PopupWidget):
     def __init__(self, parent: "MainWindow") -> None:
@@ -660,6 +709,7 @@ class DurationMenu(PopupWidget):
         self.logger.debug(f"Current duration: {current_duration}")
         self.duration_view = QtWidgets.QListView()
         self.duration_view.setItemAlignment(Qt.Alignment.AlignVCenter | Qt.Alignment.AlignHCenter)
+        self.duration_view.setMaximumWidth(100)
 
         self.duration_view.setModel(self.duration_model)
         self.duration_view.selectionModel().selectionChanged.connect(lambda ix: self.set_duration(self.duration_list[ix.indexes()[0].row()]))
@@ -675,6 +725,10 @@ class DurationMenu(PopupWidget):
         self.logger.info(f"Set duration {duration}")
         self._onclose()
         self.parent().init_game()
+
+    def show(self) -> None:
+        self.adjustSize()
+        return super().show()
 
     def retranslateUI(self) -> None:
         pass
@@ -695,7 +749,7 @@ class ModeMenu(PopupWidget):
         self.logger.debug(f"Current duration: {current_mode}")
         self.mode_view = QtWidgets.QListView()
         self.mode_view.setItemAlignment(Qt.Alignment.AlignVCenter | Qt.Alignment.AlignHCenter)
-
+        self.mode_view.setMaximumWidth(100)
         self.mode_view.setModel(self.mode_model)
         self.mode_view.selectionModel().selectionChanged.connect(lambda ix: self.set_mode(ix.indexes()[0].row()))
         for _, widgets in enumerate([
@@ -710,6 +764,10 @@ class ModeMenu(PopupWidget):
         self.logger.info(f"Set mode {mode}")
         self._onclose()
         self.parent().init_game()
+
+    def show(self) -> None:
+        self.adjustSize()
+        return super().show()
 
     def retranslateUI(self) -> None:
         pass
@@ -776,9 +834,9 @@ class TypingHintLabel(QLabel):
         self.label_width = self.geometry().width()
         max_px_length = self.label_width * self.num_lines
         self.max_chars = (
-            max_px_length/self.fontMetrics().averageCharWidth() - 8*3
+            max_px_length/self.fontMetrics().averageCharWidth() - 5*2
         )  # TODO self.fontMetrics().boundingRectChar("m").width()
-        self.char_line_width = self.label_width - 8
+        self.char_line_width = self.label_width - 5
         self.logger.debug(
             f"Max chars: {self.max_chars}; label width: {self.label_width}; px_length: {max_px_length}; font width {self.fontMetrics().averageCharWidth()}"
         )
@@ -854,6 +912,7 @@ class MainWindow(QWidget):
         self.words_to_type_label = TypingHintLabel(self)
         self.words_to_type_label.setWordWrap(True)
         self.words_to_type_label.setProperty("class", "words_to_type")
+        self.words_to_type_label.setAlignment(Qt.Alignment.AlignJustify)
         # self.words_to_type_label.setText(self.game.text)
 
         self.words_input = MainTypingArea(
@@ -861,6 +920,7 @@ class MainWindow(QWidget):
         )
         self.words_input.textEdited.connect(self.words_input._textEdited)
         self.button_reset = QPushButton()
+        self.button_reset.setMaximumWidth(100)
 
         self.sidebarLayout = QVBoxLayout()
         self.button_settings = QPushButton()
@@ -878,7 +938,7 @@ class MainWindow(QWidget):
                                         # border-radius: 40px;
                                         # color: {self.palette().text().color().name()};
                                         # """)
-        self.button_pause.setText("PAUSE")
+        self.button_pause.setText(QCoreApplication.translate("QPushButton", "PAUSE"))
         self.pause_menu = PauseMenu(self)
         self.gamestats_window = GameStatsWindow(self)
         self.button_about = QPushButton()
@@ -950,11 +1010,13 @@ class MainWindow(QWidget):
 
         self.mainLayout.addWidget(self.button_pause, 0, 2, Qt.Alignment.AlignRight)
         self.mainLayout.addWidget(self.timer_label, 1, 0)
-        # self.timer_label.hide()
+        self.timer_label.setFixedHeight(60)
+        self.words_input.setFixedHeight(60)
+
         self.mainLayout.addWidget(self.words_input, 1, 1)
         self.mainLayout.addWidget(self.words_to_type_label, 2, 0, 1, 3)
-        self.mainLayout.addWidget(self.button_reset, 3, 1)
-        self.mainLayout.addWidget(self.description_label, 4, 1)
+        self.mainLayout.addWidget(self.button_reset, 3, 1, Qt.Alignment.AlignCenter)
+        self.mainLayout.addWidget(self.description_label, 4, 1, Qt.Alignment.AlignCenter)
 
         self.sidebarLayout = QVBoxLayout()
         self.sidebarLayout.setSpacing(10)

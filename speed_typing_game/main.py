@@ -75,4 +75,5 @@ def restart_app() -> None:
 def main() -> None:
     app = QApplication(sys.argv)
     configure_app(app)
+
     sys.exit(app.exec())

@@ -78,7 +78,4 @@ QComboBox {
 
 QListView {
     border: none;
-    align-items: center;
-    align-content: center;
-    text-align: center;
 }
