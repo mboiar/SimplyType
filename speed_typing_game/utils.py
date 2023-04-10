@@ -15,12 +15,15 @@ Functions:
 import json
 import logging
 import os
+import sys
 from datetime import datetime as dt
 from typing import Dict, List, Tuple, Union, Optional
+from functools import lru_cache
 
 from PyQt6.QtGui import QColor, QPalette
 from PyQt6.QtSql import QSqlDatabase
-from PyQt6.QtCore import QObject
+from PyQt6.QtCore import QObject, QLocale
+from PyQt6.QtWidgets import QMessageBox
 
 import speed_typing_game.config as config
 
@@ -31,10 +34,10 @@ def set_stylesheet(
     object: QObject, theme: str, palette_name: Optional[str] = None
 ) -> None:
     """Set stylesheet with a given palette on the widget."""
-    logger.debug(
-        f"Attempting to set color palette of {object} to {palette_name} ({theme})"
-    )
     palette_name, palette = get_color_palette(theme, palette_name)
+    logger.debug(
+        f"Attempting to set color palette of {object} to '{palette_name}' ({theme})"
+    )
     template_path = os.path.join(
         config.RESOURCES_DIR, "styles", "template.css"
     )
@@ -79,7 +82,7 @@ def set_stylesheet(
     )
     object.setPalette(current_palette)
 
-
+@lru_cache(maxsize=4)
 def get_color_palette_names(theme: str) -> List[str]:
     """Retrieve available palette names for a dark or light theme."""
     theme_path = os.path.join(config.RESOURCES_DIR, "styles", theme)
@@ -89,7 +92,7 @@ def get_color_palette_names(theme: str) -> List[str]:
     )
     return palette_names
 
-
+@lru_cache(maxsize=10)
 def get_color_palette(theme: str, palette_name: Optional[str] = "") -> Tuple[str, Dict]:
     """Retrieve a dict with colors for a given palette name."""
     if not palette_name or not os.path.exists(
@@ -98,11 +101,11 @@ def get_color_palette(theme: str, palette_name: Optional[str] = "") -> Tuple[str
         )
     ):
         default_palette_name = get_color_palette_names(theme)[0]
-        palette_name = default_palette_name
         logger.warning(
             f"Palette {palette_name} with theme {theme} does not exist.\n\
                 Using default palette {default_palette_name} ({theme})."
         )
+        palette_name = default_palette_name
     palette_path = os.path.join(
         config.RESOURCES_DIR, "styles", theme, palette_name, "colors.json"
     )
@@ -128,18 +131,31 @@ def setup_logging(log_destination: str, log_level: Union[int, str]) -> None:
         handlers=handlers,
     )
 
+def display_error(text: str, text_verbose: str, critical: bool = True) -> None:
+    msg = QMessageBox()
+    if critical:
+        icon = QMessageBox.Icon.Critical
+    else:
+        icon = QMessageBox.Icon.Warning
+    msg.setIcon(icon)
+    msg.setText(text)
+    msg.setInformativeText(text_verbose)
+    msg.setWindowTitle(text)
+    msg.exec()
+    if critical:
+        sys.exit(1)
 
 def create_connection(db_name: str, con_name: str) -> bool:
     """Create and open a SQLite database connection."""
     con = QSqlDatabase.addDatabase("QSQLITE", con_name)
     con.setDatabaseName(db_name)
-
+    logger.info(f"Trying to open database connection {db_name}")
     if not con.open():
         logger.error(f"Database Error: {con.lastError().databaseText()}")
-        return False
+        display_error("Database Error", f"Could not open database {db_name}: {con.lastError().databaseText()}")
     return True
 
-
+@lru_cache
 def get_supported_locale() -> List[str]:
     translation_path = os.path.join(config.RESOURCES_DIR, "translate")
     locale_names = [
@@ -150,6 +166,8 @@ def get_supported_locale() -> List[str]:
     logger.debug(f"Retrieved available locale names: {locale_names}")
     return locale_names
 
+def locale_to_language_name(locale_name: str) -> QLocale.Language:
+    return QLocale(locale_name).language()
 
 def detect_dark_theme_os() -> str:
     """Attempt to determine if user's OS theme is dark (default: dark)."""

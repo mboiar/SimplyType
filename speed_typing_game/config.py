@@ -4,11 +4,12 @@ Define default project variables.
 
 import logging
 import os
+import pathlib
 
 PROJECT_NAME = "SimplyType"
 PROJECT_URL = "https://github.com/mboiar/speed-typing-game"
 PROJECT_VERSION = "v0.1-dev"
-ROOT_DIR = "speed_typing_game"
+ROOT_DIR = pathlib.Path(__file__).resolve().parent
 RESOURCES_DIR = os.path.join(ROOT_DIR, "resources")
 LOGGING_LEVEL = logging.DEBUG
 LOG_DIR = os.path.join(ROOT_DIR, "logs")

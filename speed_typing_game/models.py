@@ -13,11 +13,17 @@ import time
 from collections import Counter
 from functools import lru_cache
 from typing import Any, Dict, List, Optional, Tuple, Union
+from enum import Enum
 
 from PyQt6.QtSql import QSqlDatabase, QSqlQuery
+from PyQt6.QtCore import QAbstractListModel, QSettings, QCoreApplication
 
-from speed_typing_game import config, database
+from speed_typing_game import config, database, utils
 
+
+class Mode(str, Enum):
+    LEARNING = QCoreApplication.translate("Enum", "Learning")
+    CHALLENGE = QCoreApplication.translate("Enum", "Challenge")
 
 class Wordset:
     """A named set with unique words from certain language and difficulty."""
@@ -30,6 +36,7 @@ class Wordset:
         words: Tuple[str],
         id: Optional[int] = None,
     ) -> None:
+        super().__init__()
         self.logger = logging.getLogger(__name__)
         self.name = name
         self.language = language
@@ -47,7 +54,7 @@ class Wordset:
     def get_subset_with_repetitions(
         self, count: int, seed: Optional[float] = None
     ) -> Tuple[str]:
-        """Ranomly generate a tuple of words from this wordset, with possible repetitions."""
+        """Randomly generate a tuple of words from this wordset, with possible repetitions."""
         if not self.words:
             self.logger.warning("Unable to permute empty wordset.")
             return ()
@@ -70,7 +77,7 @@ class Wordset:
                 name, language, difficulty = data[0].split()
                 words = data[1:]
             else:
-                logger.error("Unable to read wordset from file: empty header")
+                logger.warning("Unable to read wordset from file: empty header")
                 return None
             words = tuple(i.strip().lower() for i in set(words) if i)
             if not words:
@@ -94,7 +101,7 @@ class Wordset:
             WHERE NAME = '{_name}'
             """
         else:
-            logger.error(
+            logger.warning(
                 "Cannot retrieve wordset from database: no id or name provided"
             )
             return None
@@ -103,14 +110,14 @@ class Wordset:
         db = QSqlDatabase.database(con_name)
         if not db.open():
             logger.error(f"Could not open database connection {con_name}")
-            return None
+            utils.display_error("Database Error", f"Could not open database connection '{con_name}'")
         if not database.check_table_exists(wordset_tablename, con_name):
-            logger.error(f"Table '{wordset_tablename}' does not exist.")
+            logger.warning(f"Table '{wordset_tablename}' does not exist.")
             return None
         query = QSqlQuery(db)
         query.setForwardOnly(True)
         if not query.exec(retrieveWordsetQueryString) or not query.next():
-            logger.error(
+            logger.warning(
                 f"Unable to retrieve wordset {_name} from table {wordset_tablename}:\n"
                 + query.lastError().text()
             )
@@ -127,7 +134,7 @@ class Wordset:
             WHERE W.wordset_id = '{id}'
             """
         if not query.exec(retrieveWordQueryString):
-            logger.error(
+            logger.warning(
                 f"Unable to retrieve words from table {config.WORD_TABLE}:\n"
                 + query.lastError().text()
             )
@@ -136,7 +143,7 @@ class Wordset:
         while query.next():
             words.append(query.value(0))
         if not words:
-            logger.error(f"Received empty wordset with id {id}")
+            logger.warning(f"Received empty wordset with id {id}")
             return None
         logger.debug(
             f"Retrieved wordset with {len(words)} words from table {db.databaseName()}.{wordset_tablename}"
@@ -158,51 +165,76 @@ class TypingGame:
         self,
         wordset_id: Optional[int] = None,
         seed: float = time.time(),
-        mode: str = "default",
+        mode: Mode = Mode.CHALLENGE,
         pos: int = 0,
         incorrect_chars: str = "",
         elapsed: float = 0,
         created_at: float = 0,
         id: Optional[int] = None,
+        last_updated: float = 0,
         duration: int = 30 * 1000,
+        wordset: Wordset = None
     ) -> None:
         self.logger = logging.getLogger(__name__)
         self.seed = seed if seed else time.time()
-        if wordset_id:
-            self.wordset = Wordset.from_database(wordset_id)
+        wordset_name = None
+        settings = QSettings()
+        if wordset:
+            self.wordset = wordset
         else:
-            ids = Wordset.get_available_ids()
-            if not ids:
-                self.logger.error("Found no available wordsets in database")
-                raise
-            wordset_id = ids[1]
-            wordset = Wordset.from_database(wordset_id)
-            if wordset is not None:
-                self.wordset = wordset
+            if wordset_id:
+                self.wordset = Wordset.from_database(wordset_id)
+            elif settings.contains("game/options/wordset/id"):
+                wordset_id = settings.value("game/options/wordset/id")
+            elif settings.contains("game/options/wordset/name"):
+                wordset_name = settings.value("game/options/wordset/name")
             else:
-                self.logger.error("Could not retrieve any wordset from database.")
-                return None
-            self.logger.warning(f"Using default wordset {self.wordset}")
+                ids = Wordset.get_available_ids()
+                if not ids:
+                    self.logger.error("Found no available wordsets in database")
+                    utils.display_error("Database Error", f"No available wordsets in database")
+
+                wordset_id = ids[0]
+            wordset = Wordset.from_database(id=wordset_id, _name=wordset_name)
             self.logger.debug(Wordset.from_database.cache_info())
+        if wordset is not None:
+            self.wordset = wordset
+            self.logger.info(f"Using wordset {self.wordset}")
+        else:
+            self.logger.error("No wordset provided.")
+            utils.display_error("Value Error", "No wordset provided.")
+
         self.text = " ".join(
             self.wordset.get_subset_with_repetitions(100, self.seed)
         )
         self.pos = pos
-        self.mode = mode if mode else "default"
-        self.duration = duration if duration else 30 * 1000
+        if mode:
+            self.mode = mode
+        elif settings.contains("game/options/mode"):
+            self.mode = settings.value("game/options/mode")
+        else:
+            self.mode = Mode.CHALLENGE
+        if duration:
+            self.duration = duration*1000
+        elif settings.contains("game/options/duration"):
+            self.duration = settings.value("game/options/duration")*1000
+        else:
+            self.duration = 30*1000
+        if self.mode == Mode.LEARNING:
+            self.duration = None
         self.incorrect_chars = Counter(incorrect_chars)
         self.in_progress: bool = False
         self.start_time = created_at
         self.elapsed = elapsed
-        self.last_paused: float = 0
+        self.last_paused: float = last_updated
         self.id = id
         self.logger.info(f"Initializing {self}")
 
     def __str__(self) -> str:
-        return f"TypingGame: wordset {self.wordset}, seed {self.seed}, mode {self.mode}, elapsed: {self.elapsed} out of {self.duration} ms"
+        return f"TypingGame: wordset {self.wordset}, seed {self.seed}, mode {self.mode}, elapsed: {self.elapsed:.2f} out of {self.duration/1000:.2f} s"
 
     def __repr__(self) -> str:
-        return f"TypingGame: wordset {self.wordset}, seed {self.seed}, mode {self.mode}, elapsed: {self.elapsed} out of {self.duration} ms"
+        return f"TypingGame: wordset {self.wordset}, seed {self.seed}, mode {self.mode}, elapsed: {self.elapsed:.2f} out of {self.duration/1000:.2f} s"
 
     @classmethod
     def from_database(
@@ -212,18 +244,18 @@ class TypingGame:
         logger = logging.getLogger(__name__)
         if id:
             retrieveGameQueryString = f"""
-            SELECT id, mode, wordset_id, seed, pos, incorrect_chars, elapsed, created_at
+            SELECT id, mode, wordset_id, seed, pos, incorrect_chars, elapsed, created_at, word_count, last_updated
             FROM {config.GAME_TABLE} 
             WHERE ID = '{id}'
             """
         elif created_at:
             retrieveGameQueryString = f"""
-            SELECT id, mode, wordset_id, seed, pos, incorrect_chars, elapsed, created_at
+            SELECT id, mode, wordset_id, seed, pos, incorrect_chars, elapsed, created_at, word_count, last_updated
             FROM {config.GAME_TABLE}
             WHERE created_at = '{created_at}'
             """
         else:
-            logger.error(
+            logger.warning(
                 "Cannot retrieve game from database: no id or created_at provided"
             )
             return None
@@ -232,7 +264,7 @@ class TypingGame:
         db = QSqlDatabase.database(con_name)
         if not db.open():
             logger.error(f"Could not open database connection {con_name}")
-            return None
+            utils.display_error("Database Error", f"Could not open database connection '{con_name}'")
         if not database.check_table_exists(game_tablename, con_name):
             logger.error("Game table does not exist.")
             return None
@@ -252,6 +284,8 @@ class TypingGame:
         incorrect_chars = query.value(5)
         elapsed = float(query.value(6))
         created_at = float(query.value(7))
+        word_count = int(query.value(8))
+        last_updated = float(query.value(9))
 
         logger.debug(
             f"Retrieved game created at {created_at} from table {db.databaseName()}.{game_tablename}"
@@ -265,6 +299,7 @@ class TypingGame:
             elapsed,
             created_at,
             id,
+            last_updated
         )
 
     def start_or_resume(self) -> bool:
@@ -281,9 +316,9 @@ class TypingGame:
         self.logger.info(f"Started/resumed game {self}")
         return True
 
-    def finish_or_pause(self, save: bool = True) -> bool:
+    def finish_or_pause(self, save: bool = False) -> bool:
         """Finish game if time expired or pause otherwise."""
-        if not self.in_progress or self.is_finished():
+        if (not self.in_progress or self.is_finished()):
             self.logger.warning(
                 "Unable to pause: game not in progress or finished"
             )
@@ -304,13 +339,16 @@ class TypingGame:
     def get_wpm(self) -> float:
         """Calculate average typing speed (WPM)."""
         if self.elapsed:
-            return self.get_word_count() / self.elapsed
+            return self.get_word_count() / self.elapsed * 60
         else:
             return 0
 
     def get_accuracy(self) -> float:
         """Calculate accuracy as (1 - number of incorrect characters / number of entered characters)."""
-        return (self.pos - sum(self.incorrect_chars.values())) / self.pos
+        if self.pos > 0:
+            return (self.pos - sum(self.incorrect_chars.values())) / self.pos
+        else:
+            return None
 
     def get_incorrect_char_freq(self) -> List[Tuple[str, int]]:
         """Return a list of pairs (incorrect character, incorrect character count)."""
@@ -355,7 +393,7 @@ class TypingGame:
         db = QSqlDatabase.database(con_name)
         if not db.open():
             self.logger.error(f"Could not open database connection {con_name}")
-            return None
+            utils.display_error("Database Error", f"Could not open database connection '{con_name}'")
         if not database.check_table_exists(game_tablename, con_name):
             self.logger.error("Game table does not exist.")
             return None
@@ -402,7 +440,9 @@ class TypingGame:
                 f"Unable to update game {self.id} in table {game_tablename}:\n"
                 + query.lastError().text()
             )
-            return False
+            utils.display_error("Database Error", f"Unable to update game {self.id} in table {game_tablename}:\n"
+                + query.lastError().text())
+
 
         self.logger.debug(
             f"Updated game {self.id} in table {db.databaseName()}.{game_tablename}"
