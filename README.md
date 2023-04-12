@@ -15,6 +15,10 @@ A cross-platform typing game with a clean GUI interface.
 
 ## Usage
 
+For Windows platform, there is an installer available in the latest release.
+
+There is a small possibility that in the future installers for other platforms will be added. Until then:
+
 - Clone the repository and set working directory to 'speed-typing-game'
 - Create a virtual environment and install required dependencies:
 
