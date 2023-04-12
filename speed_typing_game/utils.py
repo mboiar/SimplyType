@@ -4,7 +4,7 @@ Define utility functions.
 Functions:
 
     set_stylesheet(QApplication, str, str) -> None
-    get_color_palette_names(str) -> List[str]
+    get_color_palette_names(List[str]) -> List[str]
     get_color_palette(str, str) -> Dict
     setup_logging(str, Union[int, str]) -> None
     create_connection(str) -> bool
@@ -82,17 +82,25 @@ def set_stylesheet(
     )
     object.setPalette(current_palette)
 
-@lru_cache(maxsize=4)
-def get_color_palette_names(theme: str) -> List[str]:
-    """Retrieve available palette names for a dark or light theme."""
-    theme_path = os.path.join(config.RESOURCES_DIR, "styles", theme)
-    palette_names = [d for d in os.listdir(theme_path)]
-    logger.debug(
-        f"Retrieved available palette names for {theme} theme: {palette_names}"
-    )
+# @lru_cache(maxsize=4)
+def get_color_palette_names(themes: List[str] = None) -> List[str]:
+    """Retrieve available palette names for given themes."""
+    palette_names = []
+    for dir in os.scandir(os.path.join(config.RESOURCES_DIR, "styles")):
+        if dir.is_dir() and (themes is None or dir.name in themes):
+            palette_names.extend([file.name for file in os.scandir(dir.path)])
+    logger.debug(f"Palette names for {themes} : {palette_names}")
     return palette_names
 
-@lru_cache(maxsize=10)
+def get_theme_by_palette_name(palette_name: str) -> Optional[str]:
+    for dir in os.scandir(os.path.join(config.RESOURCES_DIR, "styles")):
+        if dir.is_dir() and palette_name in [d.name for d in os.scandir(dir)]:
+            logger.debug(f"Theme for {palette_name} : {dir.name}")
+            return dir.name
+    logger.debug(f"Could not retrieve theme for {palette_name}")
+    return None
+
+# @lru_cache(maxsize=10)
 def get_color_palette(theme: str, palette_name: Optional[str] = "") -> Tuple[str, Dict]:
     """Retrieve a dict with colors for a given palette name."""
     if not palette_name or not os.path.exists(
@@ -100,8 +108,14 @@ def get_color_palette(theme: str, palette_name: Optional[str] = "") -> Tuple[str
             config.RESOURCES_DIR, "styles", theme, palette_name, "colors.json"
         )
     ):
-        default_palette_name = get_color_palette_names(theme)[0]
-        logger.warning(
+        logger.debug(f"Trying to set theme {theme}")
+
+        palette_names = get_color_palette_names([theme])
+        if palette_names:
+            default_palette_name = palette_names[0]
+        else:
+            return None
+        logger.debug(
             f"Palette {palette_name} with theme {theme} does not exist.\n\
                 Using default palette {default_palette_name} ({theme})."
         )
@@ -189,7 +203,6 @@ def detect_dark_theme_os() -> str:
             try:
                 value_name, value, _ = winreg.EnumValue(reg_key, i)
                 if value_name == "AppsUseLightTheme":
-                    print(value)
                     is_dark_theme = value
             except OSError:
                 break

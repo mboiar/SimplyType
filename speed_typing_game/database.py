@@ -386,15 +386,15 @@ def get_game_data(
 
     queryStr = f"""
         SELECT incorrect_chars, elapsed, pos, last_updated, word_count from {game_tablename}
-        WHERE last_updated BETWEEN ? AND ?
+        WHERE last_updated BETWEEN ? AND ?;
     """
     query = QSqlQuery(db)
     query.prepare(queryStr)
-    query.addBindValue(period[0])
-    query.addBindValue(period[1])
-    if not query.exec(queryStr):
+    query.addBindValue(int(period[1]))
+    query.addBindValue(int(period[0]))
+    if not query.exec():
         logger.warning(
-            f"Unable to get data stats from {game_tablename} for time period {time.gmtime(period[0])}-{time.gmtime(period[1])}\n"
+            f"Unable to get data stats from {game_tablename} for time period {int(period[1])}-{int(period[0])}\n"
             + query.lastError().text()
         )
 

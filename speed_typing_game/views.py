@@ -23,7 +23,6 @@ from PyQt6.QtWidgets import (QButtonGroup, QFileDialog, QGridLayout, QGroupBox,
                              QPushButton, QVBoxLayout, QWidget, QAbstractButton)
 from PyQt6 import QtWidgets
 from PyQt6 import QtSql
-import pyqtgraph as pg
 
 from speed_typing_game import config, models, database, utils
 from speed_typing_game.models import TypingGame
@@ -54,10 +53,7 @@ class MainTypingArea(QLineEdit):
         self.allow_takeback = allow_takeback
         super().__init__(parent, *flags)
         self.setReadOnly(True)
-        # self.textEdited.connect(self.validate_character)
-        # self._pos = 0
         self.label = label
-        # self.typed_in = []
 
     def _textEdited(self, text: str) -> None:
         """Process user input during a game."""
@@ -66,10 +62,10 @@ class MainTypingArea(QLineEdit):
         char = text[-1]
         pos = game.pos
         char_correct = game.text[pos]
-        self.logger.debug(
-            f"Typed in '{char}' - correct answer'{char_correct}'\
- - position {pos}"
-        )
+        # self.logger.debug(
+            # f"Typed in '{char}' - correct answer'{char_correct}'\
+#  - position {pos}"
+        # )
         self.setText("")
         underline = False
         if char_correct == char:  # correct character typed
@@ -80,18 +76,21 @@ class MainTypingArea(QLineEdit):
             if game.mode == models.Mode.LEARNING:
                 return None
             game.pos += 1
-            color = self.palette().highlight().color().name()
-            if char_correct == " ":
-                char = " "
-                underline = True
+            if game.mode != models.Mode.ZEN:
+                color = self.palette().highlight().color().name()
+                if char_correct == " ":
+                    char = " "
+                    underline = True
+                else:
+                    char = char_correct
             else:
+                color = self.palette().buttonText().color().name()
                 char = char_correct
         new_char = self.set_html_color(char, color, underline)
-        # self.typed_in.append(new_char)
         self.label.formattedCharList += [new_char]
-        # new_text = "".join(self.label.formattedCharList) + game.text[game.pos :]
+        self.logger.debug(f"{self.parent().game.pos} % {int(self.label.max_chars/3)} = {self.parent().game.pos % int(self.label.char_line_width)}")
         if (
-            self.parent().game.pos % int(self.label.char_line_width) == 0
+            self.parent().game.pos % int(self.label.max_chars/3) == 0
         ):
             self.label.newline()
         else:
@@ -112,9 +111,9 @@ class MainTypingArea(QLineEdit):
         modifier_message = (
             ("with a modifier:" + str(modifier)) if modifier else ""
         )
-        self.logger.debug(
-            f"Detected keyPressEvent: key {key} {modifier_message}"
-        )
+        # self.logger.debug(
+            # f"Detected keyPressEvent: key {key} {modifier_message}"
+        # )
         is_cutpaste_event = modifier == config.CTRL_MODIFIER and key in config.CUT_KEYS
         if (not self.allow_takeback) and (
             key in config.TAKEBACK_KEYS or is_cutpaste_event
@@ -142,7 +141,7 @@ class PopupWidget(QWidget):
         super().__init__(parent)
 
         self.logger = logging.getLogger(__name__)
-        self.setWindowFlags(QtCore.Qt.WindowFlags.Popup | QtCore.Qt.WindowFlags.FramelessWindowHint)
+        self.setWindowFlags(QtCore.Qt.WindowType.Popup | QtCore.Qt.WindowType.FramelessWindowHint)
 
         self.sizePolicy().setHorizontalPolicy(QtWidgets.QSizePolicy.Policy.Minimum)
         # self.sizePolicy().setVerticalPolicy(QtWidgets.QSizePolicy.Policy.Minimum)
@@ -162,7 +161,7 @@ class PopupWidget(QWidget):
     def resizeEvent(self, event: QResizeEvent) -> None:
         p_g: QtCore.QRect = self.parent().geometry()
         s_g = self.geometry()
-        self.move(p_g.x()+p_g.width()*0.5-s_g.width()*0.5, p_g.y()+p_g.height()*0.5-s_g.height()*0.5)
+        self.move(int(p_g.x()+p_g.width()*0.5-s_g.width()*0.5), int(p_g.y()+p_g.height()*0.5-s_g.height()*0.5))
 
         ow = int(s_g.x() + s_g.width()-self.close_btn.width()-15)
         oh = int(s_g.y())
@@ -219,7 +218,7 @@ class SwitchPrivate(QtCore.QObject):
 
     def draw(self, painter: QtGui.QPainter) -> None:
         r = self.mPointer.rect()
-        margin = r.height()/10
+        margin = r.height()//10
         shadow = self.mPointer.palette().dark().color()
         light = self.mPointer.palette().light().color()
         button = self.mPointer.palette().button().color()
@@ -264,7 +263,7 @@ class Switch(QAbstractButton):
 
     def paintEvent(self, event):
         painter = QtGui.QPainter(self)
-        painter.setRenderHint(QtGui.QPainter.RenderHints.Antialiasing)
+        painter.setRenderHint(QtGui.QPainter.RenderHint.Antialiasing)
         self.dPtr.draw(painter)
 
     def resizeEvent(self, event):
@@ -276,11 +275,15 @@ class SettingsMenu(PopupWidget):
         self.initUI()
         
     def show(self) -> None:
-        if QtCore.QSettings().value("styles/theme") == "dark":
-            self.theme_switch.setChecked(True)
-        current_locale = QSettings().value("localization/locale")
-        current_language_idx = self.languages.index(utils.locale_to_language_name(current_locale))
-        self.language_box.setCurrentIndex(current_language_idx)
+        settings = QtCore.QSettings()
+        current_locale = settings.value("localization/locale")
+        current_palette = settings.value("styles/palette")
+        if current_locale:
+            current_language_idx = self.languages.index(utils.locale_to_language_name(current_locale))
+            self.language_box.setCurrentIndex(current_language_idx)
+        if current_palette:
+            current_palette_idx = self.palettes.index(current_palette)
+            self.palette_box.setCurrentIndex(current_palette_idx)
         self.adjustSize()
         super().show()
 
@@ -309,9 +312,27 @@ class SettingsMenu(PopupWidget):
         self.language_box.currentIndexChanged.connect(lambda idx: self.set_language(self.languages[idx]))
 
         self.language_selector_label = QLabel()
+        if settings.value("styles/theme") == "dark":
+            self.theme_switch.setChecked(True)
+        self.palettes = utils.get_color_palette_names()
+        self.logger.debug(f"{self.palettes}")
+        self.palette_model = QtCore.QStringListModel()
+        self.palette_model.setStringList(self.palettes)
+        settings = QtCore.QSettings()
+        self.palette_box = QtWidgets.QComboBox()
+        self.palette_box.setModel(self.palette_model)
+        current_palette = settings.value("styles/palette")
+        self.logger.debug(f"Current palette: {current_palette}")
+        if current_palette and current_palette in self.palettes:
+            current_palette_idx = self.palettes.index(current_palette)
+            self.palette_box.setCurrentIndex(current_palette_idx)
+        self.palette_box.currentIndexChanged.connect(lambda idx: self.set_palette(self.palettes[idx]))
+
+        self.palette_selector_label = QLabel()
         for i, widgets in enumerate([
             (self.theme_switch_label, self.theme_switch),
-            (self.language_selector_label, self.language_box)
+            (self.language_selector_label, self.language_box),
+            (self.palette_selector_label, self.palette_box)
         ]):
             self.layout().addWidget(widgets[0], i, 0)
             # self.layout().spacerItem()
@@ -319,26 +340,41 @@ class SettingsMenu(PopupWidget):
         self.retranslateUI()
         
     def set_language(self, language: QtCore.QLocale.Language) -> None:
-        # translator = QtCore.QTranslator()
         locale = QtCore.QLocale(language)
-        # if locale == config.DEFAULT_LOCALE:
-            # QCoreApplication.removeTranslator()
         QSettings().setValue("localization/locale", locale)
         main.restart_app()
-        # elif translator.load(locale.name() + ".qm", config.RESOURCES_DIR + "/translate/"):
-            # QCoreApplication.instance().installTranslator(translator)
-        # else:
-            # self.logger.error(f"Could not install translator for '{locale}'")
+        
+    def set_palette(self, palette_name: str) -> None:
+        settings = QSettings()
+        theme = utils.get_theme_by_palette_name(palette_name)
+        if not theme:
+            self.logger.debug(f"Could not set palette {palette_name}")
+            return None
+        set_stylesheet(
+            QCoreApplication.instance(), theme, palette_name
+        )
+        settings.setValue("styles/theme", theme)
+        settings.setValue("styles/palette", palette_name)
+        if settings.value("styles/theme") == "dark":
+            self.theme_switch.setChecked(True)
+            self.logger.debug(f"Blip: {settings.value('styles/theme')} Is checked? {self.theme_switch.isChecked()}")
+        else:
+            self.theme_switch.setChecked(False)
+            self.logger.debug(f"Blop {settings.value('styles/theme')} Is checked? {self.theme_switch.isChecked()}")
+        self.parent().repaint()
+        self.show()
 
     def toggle_theme(self) -> None:
-        settings = QSettings("BoiarTech", config.PROJECT_NAME)
+        settings = QSettings()
         themes = ["light", "dark"]
         theme = themes[self.theme_switch.isChecked()]
+        self.logger.debug(f"Is checked? : {self.theme_switch.isChecked()}")
         set_stylesheet(
             QCoreApplication.instance(), theme
         )
+        settings.setValue("styles/theme", theme)
         self.parent().repaint()
-        QtCore.QSettings().setValue("styles/theme", theme)
+        self.show()
 
     def retranslateUI(self) -> None:
         self.theme_switch_label.setText(
@@ -347,7 +383,9 @@ class SettingsMenu(PopupWidget):
         self.language_selector_label.setText(
             QCoreApplication.translate("QLabel", "Select language")
         )
-
+        self.palette_selector_label.setText(
+            QCoreApplication.translate("QLabel", "Select color scheme")
+        )
 
 class WordsetFileSelectWindow(PopupWidget):
     def __init__(self, parent: "MainWindow") -> None:
@@ -365,7 +403,7 @@ class WordsetFileSelectWindow(PopupWidget):
         self.error_label.setProperty("class", "error-text")
         self.save_to_database_checkbox = QtWidgets.QCheckBox(self)
         self.save_to_database_label = QLabel(self)
-        self.layout().addWidget(self.wordset_from_file_button, 0, 0, 1, 3, Qt.Alignment.AlignCenter)
+        self.layout().addWidget(self.wordset_from_file_button, 0, 0, 1, 3, Qt.AlignmentFlag.AlignCenter)
         self.layout().addWidget(self.error_label, 1, 0, 1, 3)
         self.layout().addWidget(self.save_to_database_label, 2, 0, 1, 2)
         self.layout().addWidget(self.save_to_database_checkbox, 2, 2, 1, 1)
@@ -434,10 +472,10 @@ class WordsetMenu(PopupWidget):
         self.model = QtSql.QSqlQueryModel()
         self.model.setQuery("SELECT name, id FROM wordsets", self.db)
         self.view = QtWidgets.QListView()
-        self.view.setItemAlignment(Qt.Alignment.AlignVCenter | Qt.Alignment.AlignHCenter)
+        self.view.setItemAlignment(Qt.AlignmentFlag.AlignVCenter | Qt.AlignmentFlag.AlignHCenter)
         self.view.setModel(self.model)
         self.view.setMaximumWidth(150)
-        self.view.setMaximumHeight(self.parent().height()*0.5)
+        self.view.setMaximumHeight(int(self.parent().height()*0.5))
         # if QSettings().contains("game/options/wordset"):
         #     ix = 1 # TODO
         #     self.view.selectionModel().select(ix, QtCore.QItemSelectionModel.SelectionFlags.SelectCurrent)
@@ -505,15 +543,21 @@ class AboutWindow(PopupWidget):
 
     def initUI(self) -> None:
         self.setLayout(QGridLayout())
+        self.title_label = QLabel()
+        font = QtGui.QFont()
+        font.setPixelSize(18)
+        self.title_label.setFont(font)
         self.about_label = QLabel()
 
         for i, widgets in enumerate([
+            (self.title_label),
             (self.about_label),
         ]):
-            self.layout().addWidget(widgets, i, 0, 1, 1, Qt.Alignment.AlignCenter)
+            self.layout().addWidget(widgets, i, 0)
             # self.layout().spacerItem()
             # self.layout().addWidget(widgets[1], i, 1)
-        self.about_label.setMaximumSize(200, 20)
+        self.title_label.setMaximumSize(200, 20)
+        # self.about_label.setMaximumWidth(600)
         self.retranslateUI()
 
     def show(self) -> None:
@@ -523,8 +567,37 @@ class AboutWindow(PopupWidget):
         # return super().resizeEvent(event)
 
     def retranslateUI(self) -> None:
-        self.about_label.setText(
+        self.title_label.setText(
             QCoreApplication.translate("QLabel", f"About {config.PROJECT_NAME}")
+        )
+        self.about_label.setText(
+            QCoreApplication.translate("QLabel", """
+Description
+
+SimplyType is a game that allows you to test your typing skills, 
+find your weaknesses or just relax typing your favorite quotes or text passages. 
+Customize interface for a better experience.
+
+
+Modes
+
+Learning: unlimited time, must type in correct character before continuing
+Challenge: time limit, incorrectly typed characters are highlighted
+Zen: type away without time limit, reset when you're done
+
+
+Authors
+
+@mboiar              Maksym Boiar
+
+
+Contributors
+
+@Basurkowsyy         Mateusz Basiura     Polish and English wordsets
+@Chalupka-student    Filip Chałupka      UI/UX Design insights
+
+2023
+""")
         )
 
 
@@ -551,6 +624,7 @@ class UserStatsWindow(PopupWidget):
                 counter.update(chars)
             self.most_inaccurate_letters = counter.most_common(10)
             self.avg_stats = [sum(i)/len(i) for i in [accs, wpms]]
+            self.logger.debug(f"{self.avg_stats}")
         # TODO
         if self.avg_stats:
             self.acc_data.setText(f"{self.avg_stats[0]:.2f}%")
@@ -572,9 +646,10 @@ class UserStatsWindow(PopupWidget):
             (self.wpm_label, self.wpm_data)
         ]):
             for j, widget in enumerate(widgets):
-                widget.setMaximumSize(200, 20)
-                self.layout().addWidget(widget, i, j, Qt.Alignment.AlignCenter)
+                widget.setMaximumWidth(200)
+                self.layout().addWidget(widget, i, j, Qt.AlignmentFlag.AlignLeft)
         self.retranslateUI()
+        self.layout().setSpacing(10)
 
     def get_game_data(self) -> Optional[List[Tuple[float, float, float, str]]]:
         return database.get_game_data()
@@ -592,9 +667,10 @@ class GameStatsWindow(PopupWidget):
 
     def show(self) -> None:
         stats = self.parent().game.get_stats()
+        self.logger.debug(f"Game stats: {stats}")
         if stats:
             self.wpm_data.setText(f"{stats['wpm']:.0f} wpm")
-            self.accuracy_data.setText(f"{stats['accuracy']*100:.0f}%")
+            self.accuracy_data.setText(f"{(stats['accuracy']*100 if stats['accuracy'] else 0):.0f}%")
             most_frequent = sorted(stats["incorrect characters frequency"], key=lambda x: x[1])[:5]
             self.incorrect_chars_data.setText(" ".join([f"'{i[0]}' ({i[1]})" for i in most_frequent]))
         self.adjustSize()
@@ -622,7 +698,7 @@ class GameStatsWindow(PopupWidget):
             (self.button_continue,)
         ]):
             for j, widget in enumerate(widgets):
-                self.layout().addWidget(widget, i, j, Qt.Alignment.AlignCenter)
+                self.layout().addWidget(widget, i, j, Qt.AlignmentFlag.AlignCenter)
                 widget.setMaximumSize(200, 20)
         self.retranslateUI()
 
@@ -708,7 +784,7 @@ class DurationMenu(PopupWidget):
         current_duration = settings.value("game/options/duration")
         self.logger.debug(f"Current duration: {current_duration}")
         self.duration_view = QtWidgets.QListView()
-        self.duration_view.setItemAlignment(Qt.Alignment.AlignVCenter | Qt.Alignment.AlignHCenter)
+        self.duration_view.setItemAlignment(Qt.AlignmentFlag.AlignVCenter | Qt.AlignmentFlag.AlignHCenter)
         self.duration_view.setMaximumWidth(100)
 
         self.duration_view.setModel(self.duration_model)
@@ -748,19 +824,20 @@ class ModeMenu(PopupWidget):
         current_mode = settings.value("game/options/mode")
         self.logger.debug(f"Current duration: {current_mode}")
         self.mode_view = QtWidgets.QListView()
-        self.mode_view.setItemAlignment(Qt.Alignment.AlignVCenter | Qt.Alignment.AlignHCenter)
+        self.mode_view.setItemAlignment(Qt.AlignmentFlag.AlignVCenter | Qt.AlignmentFlag.AlignHCenter)
         self.mode_view.setMaximumWidth(100)
         self.mode_view.setModel(self.mode_model)
-        self.mode_view.selectionModel().selectionChanged.connect(lambda ix: self.set_mode(ix.indexes()[0].row()))
+        self.mode_view.selectionModel().selectionChanged.connect(lambda ix: self.set_mode(self.mode_list[ix.indexes()[0].row()]))
         for _, widgets in enumerate([
             (self.mode_view),
         ]):
             self.layout().addWidget(widgets)
         self.retranslateUI()
 
-    def set_mode(self, mode: int) -> None:
+    def set_mode(self, mode: models.Mode) -> None:
         settings = QSettings()
         settings.setValue("game/options/mode", mode)
+        self.logger.debug(f"Set default mode to {settings.value('game/options/mode')}")
         self.logger.info(f"Set mode {mode}")
         self._onclose()
         self.parent().init_game()
@@ -789,12 +866,6 @@ class TypingHintLabel(QLabel):
         self.max_chars_displayed: float = 0
         self.min_char_pos: int = 0
         self.formattedCharList: List = []
-        # self.redraw()
-
-    def setText(self, text: str) -> None:
-        # self.logger.debug(f"Setting label text: {text}")
-        # text = text[:min(len(text), int(self.max_chars))]
-        super().setText(text)  # TODO
 
     def setCharList(self, char_list: List[str] = None) -> bool:
         if not char_list:
@@ -811,9 +882,9 @@ class TypingHintLabel(QLabel):
             )
             utils.display_error("Internal Error", f"Internal Error")
 
-        self.logger.debug(
-            f"Setting rich text {''.join(char_list+list(remaining_text))[:40]}..."
-        )
+        # self.logger.debug(
+            # f"Setting rich text {''.join(char_list+list(remaining_text))[:40]}..."
+        # )
         self.setText("".join(char_list + list(remaining_text)))
         return True
 
@@ -836,34 +907,23 @@ class TypingHintLabel(QLabel):
         self.max_chars = (
             max_px_length/self.fontMetrics().averageCharWidth() - 5*2
         )  # TODO self.fontMetrics().boundingRectChar("m").width()
-        self.char_line_width = self.label_width - 5
-        self.logger.debug(
-            f"Max chars: {self.max_chars}; label width: {self.label_width}; px_length: {max_px_length}; font width {self.fontMetrics().averageCharWidth()}"
-        )
+        self.char_line_width = self.label_width/self.fontMetrics().averageCharWidth() - 5
+        # self.logger.debug(
+            # f"Max chars: {self.max_chars}; label width: {self.label_width}; px_length: {max_px_length}; font width {self.fontMetrics().averageCharWidth()}"
+        # )
         self.setCharList()
-
-    def paintEvent(self, a0: QtGui.QPaintEvent) -> None:
-        # TODO
-        super().paintEvent(a0)
 
     def newline(self) -> None:
         if self.line_pos == 0:
             self.line_pos += 1
         elif self.line_pos == 1:
             # TODO reset caret
-            self.min_char_pos += int(self.char_line_width)
+            self.min_char_pos += int(self.max_chars/3)
             self.logger.debug(
                 f"Set new starting position: {self.min_char_pos}"
             )
         self.logger.debug(f"Newline: {self.line_pos}")
         self.setCharList()
-        # self.setText(self.parent().words[self.parent()._pos:])
-        # TODO
-        # self.label_caret.move(-4, 0)
-        # if self.cur_line == 0:
-        #     y = self.fontMetrics().lineSpacing() + self.fontMetrics().boundingRect(self.)
-        #     self.label_caret.move(x, y)
-        #     self.cur_line += 1
 
 
 class MainWindow(QWidget):
@@ -912,7 +972,7 @@ class MainWindow(QWidget):
         self.words_to_type_label = TypingHintLabel(self)
         self.words_to_type_label.setWordWrap(True)
         self.words_to_type_label.setProperty("class", "words_to_type")
-        self.words_to_type_label.setAlignment(Qt.Alignment.AlignJustify)
+        self.words_to_type_label.setAlignment(Qt.AlignmentFlag.AlignJustify)
         # self.words_to_type_label.setText(self.game.text)
 
         self.words_input = MainTypingArea(
@@ -971,7 +1031,7 @@ class MainWindow(QWidget):
         ]
         for i, menu_item in enumerate(self.menu_list):
             menu_item[0].hide()
-
+        self.button_pause.hide()
             # menu_item[1].clicked.connect(lambda: self.show_popup(self.menu_list[i][0]))
         # self.button_menu3.clicked.connect(lambda: self.show_popup(self.menu3_popup))
         self.button_menu1.clicked.connect(lambda: self.show_popup(self.menu1_popup))
@@ -1004,19 +1064,19 @@ class MainWindow(QWidget):
             button.setCursor(QCursor(Qt.CursorShape.PointingHandCursor))
         self.mainLayout.setContentsMargins(20, 20, 20, 20)
         self.mainLayout.setVerticalSpacing(20)
-        self.mainLayout.addWidget(self.title, 0, 0, Qt.Alignment.AlignLeft)
+        self.mainLayout.addWidget(self.title, 0, 0, Qt.AlignmentFlag.AlignLeft)
 
         self.mainLayout.setRowMinimumHeight(1, 100)
 
-        self.mainLayout.addWidget(self.button_pause, 0, 2, Qt.Alignment.AlignRight)
+        self.mainLayout.addWidget(self.button_pause, 0, 2, Qt.AlignmentFlag.AlignRight)
         self.mainLayout.addWidget(self.timer_label, 1, 0)
         self.timer_label.setFixedHeight(60)
         self.words_input.setFixedHeight(60)
 
         self.mainLayout.addWidget(self.words_input, 1, 1)
         self.mainLayout.addWidget(self.words_to_type_label, 2, 0, 1, 3)
-        self.mainLayout.addWidget(self.button_reset, 3, 1, Qt.Alignment.AlignCenter)
-        self.mainLayout.addWidget(self.description_label, 4, 1, Qt.Alignment.AlignCenter)
+        self.mainLayout.addWidget(self.button_reset, 3, 1, Qt.AlignmentFlag.AlignCenter)
+        self.mainLayout.addWidget(self.description_label, 4, 1, Qt.AlignmentFlag.AlignCenter)
 
         self.sidebarLayout = QVBoxLayout()
         self.sidebarLayout.setSpacing(10)
@@ -1073,6 +1133,8 @@ class MainWindow(QWidget):
     def reset_game(self) -> None:
         self.logger.debug("Reset game")
         self.remaining_time = 0
+        self.button_pause.hide()
+
         self.game.finish_or_pause(save=False)
         self.words_to_type_label.formattedCharList.clear()
         self.words_to_type_label.line_pos = 0
@@ -1083,6 +1145,8 @@ class MainWindow(QWidget):
                 self.update_timer.stop()
             if self.timer.isActive():
                 self.timer.stop()
+        if self.game.duration < 0:
+            self.show_popup(self.gamestats_window)
         self.init_game()
 
         for button in [
@@ -1096,6 +1160,7 @@ class MainWindow(QWidget):
             # self.button_exit,
         ]:
             button.show()
+        self.button_reset.setText(QCoreApplication.translate("QPushButton", "Reset"))
         self.timer_label.setText("")
 
         self.description_label.show()
@@ -1173,6 +1238,7 @@ class MainWindow(QWidget):
         ]:
             button.hide()
         self.description_label.hide()
+        self.button_pause.show()
         # self.timer_label.show()
 
         if self.game.duration != -1:
@@ -1182,7 +1248,13 @@ class MainWindow(QWidget):
         else:
             # pass
             self.timer_label.setText("")
-
+        if self.game.duration >= 0:
+            reset_label = QCoreApplication.translate("QPushButton", "Reset")
+        else:
+            reset_label = QCoreApplication.translate("QPushButton", "Finish")
+        self.button_reset.setText(
+            reset_label
+        )
         self.game.start_or_resume()
 
     def display_results(self) -> None:
@@ -1206,6 +1278,8 @@ class MainWindow(QWidget):
 
     def finish_game(self, save: bool = True) -> None:
         self.remaining_time = 0
+        self.button_pause.hide()
+
         if not self.game.finish_or_pause(save=save):
             return None
         self.words_to_type_label.formattedCharList.clear()
@@ -1216,7 +1290,7 @@ class MainWindow(QWidget):
             self.update_timer.stop()
         self.show_popup(self.gamestats_window)
         self.init_game()
-
+        self.button_reset.setText(QCoreApplication.translate("QPushButton", "Reset"))
         for button in [
             self.button_about,
             self.button_menu1,
@@ -1235,7 +1309,12 @@ class MainWindow(QWidget):
         self.set_focus()
 
     def update_timer_label(self) -> None:
-        self.timer_label.setText(str(int(self.timer.remainingTime() // 1000)))
+        timer_val = int(self.timer.remainingTime() // 1000)
+        if timer_val >= 0:
+            timer_val = str(timer_val)
+        else:
+            timer_val = ""
+        self.timer_label.setText(timer_val)
 
     def repaint(self) -> None:
         super().repaint()

@@ -24,6 +24,7 @@ from speed_typing_game import config, database, utils
 class Mode(str, Enum):
     LEARNING = QCoreApplication.translate("Enum", "Learning")
     CHALLENGE = QCoreApplication.translate("Enum", "Challenge")
+    ZEN = QCoreApplication.translate("Enum", "Zen")
 
 class Wordset:
     """A named set with unique words from certain language and difficulty."""
@@ -178,7 +179,7 @@ class TypingGame:
         self.logger = logging.getLogger(__name__)
         self.seed = seed if seed else time.time()
         wordset_name = None
-        settings = QSettings()
+        settings = QSettings("AGHTech", config.PROJECT_NAME)
         if wordset:
             self.wordset = wordset
         else:
@@ -210,8 +211,11 @@ class TypingGame:
         self.pos = pos
         if mode:
             self.mode = mode
+            self.logger.debug(f"Setting mode to {self.mode} from provided value")
+
         elif settings.contains("game/options/mode"):
             self.mode = settings.value("game/options/mode")
+            self.logger.debug(f"Setting mode to {self.mode} from settings")
         else:
             self.mode = Mode.CHALLENGE
         if duration:
@@ -220,8 +224,9 @@ class TypingGame:
             self.duration = settings.value("game/options/duration")*1000
         else:
             self.duration = 30*1000
-        if self.mode == Mode.LEARNING:
-            self.duration = None
+        if self.mode == Mode.LEARNING or self.mode == Mode.ZEN:
+            self.duration = -1
+        self.logger.debug(f"Mode {self.mode} {self.mode==Mode.ZEN} {Mode.ZEN}: setting duration to {self.duration}")
         self.incorrect_chars = Counter(incorrect_chars)
         self.in_progress: bool = False
         self.start_time = created_at
@@ -327,6 +332,7 @@ class TypingGame:
         self.elapsed += pause_time - self.last_paused
         self.last_paused = pause_time
         self.in_progress = False
+        self.logger.debug(f"Finished: {pause_time} {self.elapsed} {self.in_progress}")
         if save:
             return self.save()
         else:
@@ -356,7 +362,10 @@ class TypingGame:
 
     def is_finished(self) -> bool:
         """Check if game time expired."""
-        return self.elapsed > self.duration
+        if self.duration < 0:
+            return False
+        else:
+            return self.elapsed > self.duration
 
     def get_stats(self) -> Dict:
         """Return a game summary dictionary."""

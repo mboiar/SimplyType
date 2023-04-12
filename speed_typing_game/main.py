@@ -40,6 +40,14 @@ def configure_app(app: QApplication) -> None:
     else:
         theme = "dark"
         settings.setValue("styles/theme", theme)
+
+    if settings.contains("styles/palette"):
+        palette_name = settings.value("styles/palette")
+        logger.debug(f"Retrieved palette from settings: {palette_name}")
+    else:
+        palette_name = get_color_palette_names([theme])[0]
+        settings.setValue("styles/palette", palette_name)
+
     if settings.contains("localization/locale"):
         locale = settings.value("localization/locale")
         logger.debug(f"Retrieved locale from settings: {locale}")
@@ -51,8 +59,6 @@ def configure_app(app: QApplication) -> None:
         logger.debug(f"Set locale: {locale}")
     else:
         logger.debug(f"Set locale: {config.DEFAULT_LOCALE}")
-
-    palette_name = get_color_palette_names(theme)[0]
  
     set_stylesheet(app, theme, palette_name)
     icon = QIcon(
