@@ -2,7 +2,7 @@
 
 A cross-platform typing game with a clean GUI interface.
 
-![main window](https://github.com/mboiar/speed-typing-game/blob/main/modes.png?raw=true)
+![main window](https://github.com/mboiar/speed-typing-game/blob/main/screenshots/modes.png?raw=true)
 
 ## Features
 
@@ -22,7 +22,7 @@ A cross-platform typing game with a clean GUI interface.
 - Cannot proceed further until correct character is typed in
 - Summary with  the most frequently incorrectly typed characters, wpm etc.
 
-![learning mode gameplay gif](https://github.com/mboiar/speed-typing-game/blob/main/learningmode.gif?raw=true)
+![learning mode gameplay gif](https://github.com/mboiar/speed-typing-game/blob/main/screenshots/learningmode.gif?raw=true)
 
 ### Challenge mode
 
@@ -30,7 +30,7 @@ A cross-platform typing game with a clean GUI interface.
 - Incorrectly typed characters are highlighted in real time
 - Summary with the most frequently incorrectly typed characters, wpm etc.
 
-![challenge mode gameplay gif](https://github.com/mboiar/speed-typing-game/blob/main/challengemode.gif?raw=true)
+![challenge mode gameplay gif](https://github.com/mboiar/speed-typing-game/blob/main/screenshots/challengemode.gif?raw=true)
 
 ### Zen mode
 
@@ -38,7 +38,7 @@ A cross-platform typing game with a clean GUI interface.
 - Type anything you like
 - Relax
 
-![zen mode gameplay gif](https://github.com/mboiar/speed-typing-game/blob/main/zenmode.gif?raw=true)
+![zen mode gameplay gif](https://github.com/mboiar/speed-typing-game/blob/main/screenshots/zenmode.gif?raw=true)
 
 
 
